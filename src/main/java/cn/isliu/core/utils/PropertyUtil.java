@@ -15,12 +15,24 @@ import java.lang.reflect.Type;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * 属性工具类
+ *
+ * 提供处理实体类属性和注解的相关工具方法，
+ * 主要用于解析@TableProperty注解并构建字段映射关系
+ */
 public class PropertyUtil {
 
     /**
      * 获取类及其嵌套类上@TableProperty注解的字段映射关系
-     * 注解中的值作为key，FieldProperty对象作为value
+     * 
+     * 此方法是入口方法，用于获取一个类及其所有嵌套类中，
+     * 被@TableProperty注解标记的字段的映射关系。
+     * 注解中的值作为key，FieldProperty对象作为value返回。
      *
+     * 对于嵌套属性，使用'.'连接符来表示层级关系。
+     * 该方法会过滤掉有子级的字段，只返回最底层的字段映射。
+     * 
      * @param clazz 要处理的类
      * @return 包含所有@TableProperty注解字段映射关系的Map，嵌套属性使用'.'连接
      */
@@ -42,6 +54,11 @@ public class PropertyUtil {
     /**
      * 递归获取类及其嵌套类上@TableProperty注解的字段映射关系
      *
+     * 这是一个递归方法，用于深入处理类的继承结构和嵌套结构，
+     * 收集所有被@TableProperty注解标记的字段信息。
+     *
+     * 方法会处理循环引用问题，并限制递归深度，防止栈溢出。
+     * 
      * @param clazz 当前处理的类
      * @param result 存储结果的Map
      * @param keyPrefix key的前缀（使用注解中的值构建）
@@ -302,6 +319,9 @@ public class PropertyUtil {
     /**
      * 判断是否为复杂类型（非基本类型、包装类型或String）
      *
+     * 此方法用于判断一个类是否为复杂类型，即需要进一步处理的类型。
+     * 复杂类型通常包含嵌套字段，需要递归处理其内部结构。
+     *
      * @param clazz 要判断的类
      * @return 是否为复杂类型
      */
@@ -326,6 +346,15 @@ public class PropertyUtil {
                 clazz.equals(java.time.LocalDateTime.class));
     }
 
+    /**
+     * 从字段属性映射中提取表头列表
+     *
+     * 此方法根据字段的@TableProperty注解中的order属性对字段进行排序，
+     * 返回按顺序排列的表头列表，用于数据展示时的列顺序。
+     *
+     * @param fieldsMap 字段属性映射
+     * @return 按顺序排列的表头列表
+     */
     @NotNull
     public static List<String> getHeaders(Map<String, FieldProperty> fieldsMap) {
         return fieldsMap.entrySet().stream()

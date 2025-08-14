@@ -6,7 +6,39 @@
 
     <groupId>cn.isliu</groupId>
     <artifactId>feishu-table-helper</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>0.0.1</version>
+
+    <name>${project.groupId}:${project.artifactId}</name>
+    <description>
+        Feishu Table Assistant makes reading and writing operations on Feishu tables extremely simple.
+    </description>
+    <url>https://github.com/luckday-cn/feishu-table-helper</url>
+
+    <licenses>
+        <license>
+            <name>The Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <name>liu</name>
+            <email>luckday@isliu.cn</email>
+            <url>https://github.com/luckday-cn/feishu-table-helper</url>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>scm:git:git://github.com/luckday-cn/feishu-table-helper.git</connection>
+        <developerConnection>scm:git:ssh://github.com/luckday-cn/feishu-table-helper.git</developerConnection>
+        <url>http://github.com/luckday-cn/feishu-table-helper/tree/master</url>
+    </scm>
+
+    <issueManagement>
+        <system>GitHub</system>
+        <url>https://github.com/luckday-cn/feishu-table-helper/issues</url>
+    </issueManagement>
 
     <properties>
         <maven.compiler.source>8</maven.compiler.source>
@@ -31,4 +63,77 @@
             <version>2.8.9</version>
         </dependency>
     </dependencies>
+
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <goals>
+                            <goal>jar-no-fork</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <version>3.1.0</version>
+                <configuration>
+                    <additionalJOptions>
+                        <additionalJOption>-Xdoclint:none</additionalJOption>
+                    </additionalJOptions>
+                    <maxmemory>1024</maxmemory>
+                    <encoding>UTF-8</encoding>
+                    <show>protected</show>
+                    <notree>true</notree>
+
+                    <!-- Avoid running into Java 8's very restrictive doclint issues -->
+                    <failOnError>false</failOnError>
+                    <doclint>none</doclint>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>attach-javadocs</id>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-gpg-plugin</artifactId>
+                <version>3.0.1</version>
+                <executions>
+                    <execution>
+                        <id>sign-artifacts</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>sign</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.sonatype.central</groupId>
+                <artifactId>central-publishing-maven-plugin</artifactId>
+                <version>0.4.0</version>
+                <extensions>true</extensions>
+                <configuration>
+                    <publishingServerId>central</publishingServerId>
+                    <tokenAuth>true</tokenAuth>
+                    <deploymentName>${project.groupId}:${project.artifactId}:${project.version}</deploymentName>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+
 </project>

@@ -17,10 +17,25 @@ import java.util.stream.Collectors;
 
 import java.lang.reflect.InvocationTargetException;
 
+/**
+ * 字段转换工具类
+ * 
+ * 提供将飞书表格数据转换为实体类字段值的工具方法，
+ * 支持不同字段类型的转换处理
+ */
 public class ConvertFieldUtil {
     private static final Logger log = Logger.getLogger(ConvertFieldUtil.class.getName());
     private static final Gson gson = new Gson();
 
+    /**
+     * 将位置键转换为字段名
+     * 
+     * 根据字段属性映射关系，将表格中的位置键（如"A1"）转换为实体类字段名
+     * 
+     * @param jsonObject 包含位置键值对的JSON对象
+     * @param fieldsMap 字段属性映射关系Map
+     * @return 转换后的字段名值映射Map
+     */
     public static Map<String, Object> convertPositionToField(JsonObject jsonObject, Map<String, FieldProperty> fieldsMap) {
         Map<String, Object> result = new HashMap<>();
 
@@ -45,6 +60,15 @@ public class ConvertFieldUtil {
         return result;
     }
 
+    /**
+     * 根据字段规则获取值
+     * 
+     * 根据字段类型和配置规则处理字段值
+     * 
+     * @param tableProperty 表格属性注解
+     * @param value 原始值
+     * @return 处理后的值
+     */
     private static Object getValueByFieldRule(TableProperty tableProperty, JsonElement value) {
         if (tableProperty == null || value == null || value.isJsonNull()) {
             return null;
@@ -90,6 +114,14 @@ public class ConvertFieldUtil {
         return result;
     }
 
+    /**
+     * 获取文本链接
+     * 
+     * 从JSON元素中提取文本链接信息
+     * 
+     * @param value JSON元素
+     * @return 文本链接列表
+     */
     private static Object getTextUrl(JsonElement value) {
         if (value instanceof JsonArray) {
             List<String> fileUrls = new ArrayList<>();

@@ -15,12 +15,24 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
+/**
+ * 实例生成工具类
+ * 
+ * 提供根据数据映射关系生成实体类实例的工具方法，
+ * 支持嵌套对象和集合类型的处理
+ */
 public class GenerateUtil {
 
     private static final Logger log = Logger.getLogger(GenerateUtil.class.getName());
 
     /**
      * 根据配置和数据生成DTO对象（通用版本）
+     * 
+     * @param fieldPathList 字段路径列表
+     * @param clazz 实体类Class对象
+     * @param dataMap 数据映射Map
+     * @param <T> 实体类泛型
+     * @return 实体类实例
      */
     public static <T> T generateInstance(List<String> fieldPathList, Class<T> clazz, Map<String, Object> dataMap) {
         T t;
@@ -47,6 +59,11 @@ public class GenerateUtil {
 
     /**
      * 递归设置嵌套字段值（支持List类型处理）
+     * 
+     * @param target 目标对象
+     * @param fieldPath 字段路径
+     * @param value 字段值
+     * @throws Exception 设置字段时可能抛出的异常
      */
     private static void setNestedField(Object target, String fieldPath, Object value)
             throws Exception {
@@ -54,6 +71,15 @@ public class GenerateUtil {
         setNestedFieldRecursive(target, parts, 0, value);
     }
 
+    /**
+     * 递归设置嵌套字段值
+     * 
+     * @param target 目标对象
+     * @param parts 字段路径分段数组
+     * @param index 当前处理的字段索引
+     * @param value 字段值
+     * @throws Exception 设置字段时可能抛出的异常
+     */
     private static void setNestedFieldRecursive(Object target, String[] parts, int index, Object value)
             throws Exception {
         if (index >= parts.length - 1) {
@@ -101,7 +127,7 @@ public class GenerateUtil {
                 try {
                     nestedObj = field.getType().getDeclaredConstructor().newInstance();
                     field.set(target, nestedObj);
-                } catch (Exception e) {
+                } catch (InstantiationException e) {
                     // 如果无法创建实例，则记录日志并跳过该字段
                     log.log(Level.WARNING, "无法创建嵌套对象实例: " + field.getType().getName() + ", 字段: " + fieldName, e);
                     return;
@@ -109,7 +135,7 @@ public class GenerateUtil {
             }
         }
 
-        // 递归处理下一级
+        // 递归处理下一级字段
         setNestedFieldRecursive(nestedObj, parts, index + 1, value);
     }
 

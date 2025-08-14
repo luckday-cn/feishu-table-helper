@@ -29,6 +29,11 @@ import java.util.logging.Logger;
 import java.util.logging.Level;
 
 
+/**
+ * 飞书API工具类
+ * 
+ * 封装了与飞书表格API交互的各种操作方法，包括数据读取、元数据获取、单元格合并等操作
+ */
 public class FsApiUtil {
 
     private static final Gson gson = new Gson();
@@ -36,6 +41,18 @@ public class FsApiUtil {
     private static final String REQ_TYPE = "JSON_STR";
     public static final int DEFAULT_ROW_NUM = 1000;
 
+    /**
+     * 获取工作表数据
+     * 
+     * 从指定的飞书表格中读取指定范围的数据
+     * 
+     * @param sheetId 工作表ID
+     * @param spreadsheetToken 电子表格Token
+     * @param startPosition 起始位置（如"A1"）
+     * @param endPosition 结束位置（如"Z100"）
+     * @param client 飞书客户端
+     * @return 表格数据对象
+     */
     public static ValuesBatch getSheetData(String sheetId, String spreadsheetToken, String startPosition, String endPosition, FeishuClient client) {
         ValuesBatch valuesBatch = null;
         try {
@@ -64,6 +81,16 @@ public class FsApiUtil {
         return valuesBatch;
     }
 
+    /**
+     * 获取工作表元数据
+     * 
+     * 获取指定工作表的元数据信息，包括行列数、工作表名称等
+     * 
+     * @param sheetId 工作表ID
+     * @param client 飞书客户端
+     * @param spreadsheetToken 电子表格Token
+     * @return 工作表对象
+     */
     public static Sheet getSheetMetadata(String sheetId, FeishuClient client, String spreadsheetToken) {
         try {
             QuerySpreadsheetSheetReq req = QuerySpreadsheetSheetReq.newBuilder()
@@ -98,6 +125,16 @@ public class FsApiUtil {
         }
     }
 
+    /**
+     * 合并单元格
+     * 
+     * 在指定工作表中合并指定范围的单元格
+     * 
+     * @param cell 合并范围（如"A1:B2"）
+     * @param sheetId 工作表ID
+     * @param client 飞书客户端
+     * @param spreadsheetToken 电子表格Token
+     */
     public static void mergeCells(String cell, String sheetId, FeishuClient client, String spreadsheetToken) {
         try {
             CustomCellService.CellBatchUpdateRequest batchMergeRequest = CustomCellService.CellBatchUpdateRequest.newBuilder()

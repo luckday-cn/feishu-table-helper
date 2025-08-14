@@ -14,8 +14,26 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
+/**
+ * 飞书表格助手主入口类
+ * 
+ * 提供对飞书表格的创建、读取和写入操作的统一接口。
+ * 通过实体类注解映射，简化对飞书表格的操作。
+ */
 public class FsHelper {
 
+    /**
+     * 创建飞书表格
+     * 
+     * 根据传入的实体类结构，在指定的电子表格中创建一个新的工作表，
+     * 并设置表头、样式、单元格格式和下拉选项等。
+     * 
+     * @param sheetName 工作表名称
+     * @param spreadsheetToken 电子表格Token
+     * @param clazz 实体类Class对象，用于解析表头和字段属性
+     * @param <T> 实体类泛型
+     * @return 创建成功返回true
+     */
     public static <T> Boolean create(String sheetName, String spreadsheetToken, Class<T> clazz) {
         Map<String, FieldProperty> fieldsMap = PropertyUtil.getTablePropertyFieldsMap(clazz);
         List<String> headers = PropertyUtil.getHeaders(fieldsMap);
@@ -41,6 +59,17 @@ public class FsHelper {
     }
 
 
+    /**
+     * 从飞书表格中读取数据
+     * 
+     * 根据指定的工作表ID和电子表格Token，读取表格数据并映射到实体类对象列表中。
+     * 
+     * @param sheetId 工作表ID
+     * @param spreadsheetToken 电子表格Token
+     * @param clazz 实体类Class对象，用于数据映射
+     * @param <T> 实体类泛型
+     * @return 映射后的实体类对象列表
+     */
     public static <T> List<T> read(String sheetId, String spreadsheetToken, Class<T> clazz) {
         List<T> results = new ArrayList<>();
         Sheet sheet = FsApiUtil.getSheetMetadata(sheetId, FsClientUtil.getFeishuClient(), spreadsheetToken);
@@ -64,6 +93,17 @@ public class FsHelper {
         return  results;
     }
 
+    /**
+     * 将数据写入飞书表格
+     * 
+     * 将实体类对象列表写入到指定的飞书表格中，支持新增和更新操作。
+     * 
+     * @param sheetId 工作表ID
+     * @param spreadsheetToken 电子表格Token
+     * @param dataList 实体类对象列表
+     * @param <T> 实体类泛型
+     * @return 写入操作结果
+     */
     public static <T> Object write(String sheetId, String spreadsheetToken, List<T> dataList) {
         if (dataList.isEmpty()) {
             return null;

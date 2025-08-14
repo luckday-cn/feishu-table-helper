@@ -13,7 +13,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 自定义数据值服务 提供官方SDK未覆盖的数据操作API
+ * 自定义数据值服务
+ * 
+ * 提供官方SDK未覆盖的数据操作API，封装了对飞书表格数据的批量操作功能，
+ * 包括读取、写入、插入、追加等操作。
  */
 public class CustomValueService extends FeishuApiClient {
 

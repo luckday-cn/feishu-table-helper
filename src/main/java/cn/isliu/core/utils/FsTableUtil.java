@@ -13,8 +13,23 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * 飞书表格工具类
+ * 
+ * 提供处理飞书表格数据和格式的工具方法，
+ * 包括数据处理、样式设置、选项设置等功能
+ */
 public class FsTableUtil {
 
+    /**
+     * 获取飞书表格数据
+     * 
+     * 从指定的工作表中读取并处理表格数据
+     * 
+     * @param sheet 工作表对象
+     * @param spreadsheetToken 电子表格Token
+     * @return 飞书表格数据列表
+     */
     public static List<FsTableData> getFsTableData(Sheet sheet, String spreadsheetToken) {
 
         // 计算数据范围
@@ -71,10 +86,23 @@ public class FsTableUtil {
         }).collect(Collectors.toList());
     }
 
+    /**
+     * 获取飞书表格数据
+     * 
+     * @param tableData 表格数据对象
+     * @return 飞书表格数据列表
+     */
     private static List<FsTableData> getFsTableData(TableData tableData) {
         return getFsTableData(tableData, new ArrayList<>());
     }
 
+    /**
+     * 获取飞书表格数据
+     * 
+     * @param tableData 表格数据对象
+     * @param ignoreUniqueFields 忽略的唯一字段列表
+     * @return 飞书表格数据列表
+     */
     private static List<FsTableData> getFsTableData(TableData tableData, List<String> ignoreUniqueFields) {
 
         List<FsTableData> fsTableList = new LinkedList<>();
@@ -307,17 +335,5 @@ public class FsTableUtil {
         colorTemplate = colorTemplate.replace("RANG", "A1:" + FsTableUtil.getColumnNameByNuNumber(size) + "1");
         colorTemplate = colorTemplate.replace("FORE_COLOR", FsConfig.FORE_COLOR).replace("BACK_COLOR", FsConfig.BACK_COLOR);
         return colorTemplate;
-    }
-
-    public static void main(String[] args) {
-        FsConfig.initConfig("cli_a73813628afbd00d", "ouFTDr0Qu5WCgoPS8mgULg6uT0lDEUtX");
-
-        String sheetId = "2HokFi";
-        String spreadsheetToken = "SYRysUIcaheEbNt8KTocxRBinCh";
-        Sheet sheet = FsApiUtil.getSheetMetadata(sheetId,  FsClientUtil.getFeishuClient(), spreadsheetToken);
-
-
-        Map<String, String> headFieldMap = getTitlePostionMap(sheet, spreadsheetToken);
-        System.out.println(headFieldMap);
     }
 }
