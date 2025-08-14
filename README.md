@@ -8,7 +8,7 @@ feishu-table-helper 是一个简化飞书表格操作的 Java 库。通过使用
 
 ## 功能特性
 
-- **注解驱动**: 使用 [@TableProperty](file:///D:/private/gitea/feishu-table-helper/src/main/java/cn/isliu/core/annotation/TableProperty.java#L15-L71) 注解将实体类字段映射到表格列
+- **注解驱动**: 使用 [@TableProperty](file://../src/main/java/cn/isliu/core/annotation/TableProperty.java#L15-L71) 注解将实体类字段映射到表格列
 - **自动创建表格**: 根据实体类结构自动创建飞书表格和设置表头
 - **数据读取**: 从飞书表格读取数据并映射到实体类对象
 - **数据写入**: 将实体类对象写入飞书表格，支持新增和更新操作
@@ -100,7 +100,7 @@ employees.forEach(emp -> System.out.println(emp.name + " - " + emp.email));
 
 ## 配置选项
 
-通过 [FsConfig](file:///D:/private/gitea/feishu-table-helper/src/main/java/cn/isliu/core/config/FsConfig.java#L5-L55) 类可以配置以下选项：
+通过 [FsConfig](file://../src/main/java/cn/isliu/core/config/FsConfig.java#L5-L55) 类可以配置以下选项：
 
 - `headLine`: 表头行号
 - `titleLine`: 标题行号
