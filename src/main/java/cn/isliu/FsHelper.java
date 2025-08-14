@@ -32,9 +32,9 @@ public class FsHelper {
      * @param spreadsheetToken 电子表格Token
      * @param clazz 实体类Class对象，用于解析表头和字段属性
      * @param <T> 实体类泛型
-     * @return 创建成功返回true
+     * @return 创建成功返回工作表ID
      */
-    public static <T> Boolean create(String sheetName, String spreadsheetToken, Class<T> clazz) {
+    public static <T> String create(String sheetName, String spreadsheetToken, Class<T> clazz) {
         Map<String, FieldProperty> fieldsMap = PropertyUtil.getTablePropertyFieldsMap(clazz);
         List<String> headers = PropertyUtil.getHeaders(fieldsMap);
 
@@ -55,7 +55,7 @@ public class FsHelper {
 
         // 5 设置表格下拉
         FsTableUtil.setTableOptions(spreadsheetToken, headers, fieldsMap, sheetId);
-        return true;
+        return sheetId;
     }
 
 
