@@ -38,7 +38,6 @@ import cn.isliu.core.enums.ErrorCode;
 public class FsApiUtil {
 
     private static final Gson gson = new Gson();
-    // 使用统一的FsLogger替代java.util.logging.Logger
     private static final String REQ_TYPE = "JSON_STR";
     public static final int DEFAULT_ROW_NUM = 1000;
 
@@ -123,57 +122,6 @@ public class FsApiUtil {
         } catch (Exception e) {
             FsLogger.error(ErrorCode.API_CALL_FAILED, "【飞书表格】 获取Sheet元数据异常！错误信息：" + e.getMessage(), "getSheetMeta", e);
             throw new FsHelperException("【飞书表格】 获取Sheet元数据异常！");
-        }
-    }
-
-    /**
-     * 合并单元格
-     * 
-     * 在指定工作表中合并指定范围的单元格
-     * 
-     * @param cell 合并范围（如"A1:B2"）
-     * @param sheetId 工作表ID
-     * @param client 飞书客户端
-     * @param spreadsheetToken 电子表格Token
-     */
-    public static void mergeCells(String cell, String sheetId, FeishuClient client, String spreadsheetToken) {
-        try {
-            CustomCellService.CellBatchUpdateRequest batchMergeRequest = CustomCellService.CellBatchUpdateRequest.newBuilder()
-                    .addRequest(CustomCellService.CellRequest.mergeCells().setReqType(REQ_TYPE)
-                            .setReqParams(cell.replaceAll("%SHEET_ID%", sheetId)).build())
-                    .build();
-
-            ApiResponse batchMergeResp = client.customCells().cellsBatchUpdate(spreadsheetToken, batchMergeRequest);
-
-            if (!batchMergeResp.success()) {
-                FsLogger.warn("【飞书表格】 合并单元格请求异常！参数：{}，错误信息：{}", cell, batchMergeResp.getMsg());
-                throw new FsHelperException("【飞书表格】 合并单元格请求异常！");
-            }
-        } catch (Exception e) {
-            FsLogger.warn("【飞书表格】 合并单元格异常！参数：{}，错误信息：{}", cell, e.getMessage());
-            throw new FsHelperException("【飞书表格】 合并单元格异常！");
-        }
-    }
-
-    public static void createTemplateHead(String head, String sheetId, FeishuClient client, String spreadsheetToken) {
-        try {
-            // 批量操作数据值（在一个请求中同时执行多个数据操作）
-            CustomValueService.ValueBatchUpdateRequest batchValueRequest = CustomValueService.ValueBatchUpdateRequest.newBuilder()
-                    // 在指定范围前插入数据
-                    .addRequest(CustomValueService.ValueRequest.batchPutValues()
-                            .setReqType(REQ_TYPE)
-                            .setReqParams(head.replaceAll("%SHEET_ID%", sheetId))
-                            .build())
-                    .build();
-
-            ApiResponse apiResponse = client.customValues().valueBatchUpdate(spreadsheetToken, batchValueRequest);
-            if (!apiResponse.success()) {
-                FsLogger.warn("【飞书表格】 写入表格头数据异常！错误信息：{}", apiResponse.getMsg());
-                throw new FsHelperException("【飞书表格】 写入表格头数据异常！");
-            }
-        } catch (Exception e) {
-            FsLogger.warn("【飞书表格】 写入表格头异常！错误信息：{}", e.getMessage());
-            throw new FsHelperException("【飞书表格】 写入表格头异常！");
         }
     }
 
@@ -497,9 +445,8 @@ public class FsApiUtil {
         }
     }
 
-    public static Object imageUpload(String filePath, String fileName, String position ,String sheetId, String spreadsheetToken, FeishuClient client) {
+    public static Object imageUpload(byte[] imageData, String fileName, String position ,String sheetId, String spreadsheetToken, FeishuClient client) {
         try {
-            byte[] imageData = FileUtil.getImageData(filePath);
 
             CustomValueService.ValueRequest imageRequest = CustomValueService.ValueRequest.imageValues()
                     .range(sheetId, position)
@@ -514,11 +461,11 @@ public class FsApiUtil {
             ApiResponse imageResp = client.customValues().valueBatchUpdate(spreadsheetToken, imageWriteRequest);
 
             if (!imageResp.success()) {
-                FsLogger.warn("【飞书表格】 图片上传失败！参数：{}，错误信息：{}", filePath, gson.toJson(imageResp));
+                FsLogger.error(ErrorCode.API_SERVER_ERROR, "【飞书表格】 文件上传失败！" + gson.toJson(imageResp));
             }
             return imageResp.getData();
         } catch (Exception e) {
-            FsLogger.warn("【飞书表格】 图片上传异常！参数：{}，错误信息：{}", filePath, e.getMessage());
+            FsLogger.error(ErrorCode.API_SERVER_ERROR,"【飞书表格】 文件上传异常！" + e.getMessage(), fileName, e);
         }
 
         return null;

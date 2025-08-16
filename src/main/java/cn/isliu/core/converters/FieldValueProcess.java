@@ -7,5 +7,5 @@ public interface FieldValueProcess<T> {
     /**
      * 反向处理，将枚举值转换为原始值
      */
-     T reverseProcess(Object value);
+     Object reverseProcess(Object value);
 }

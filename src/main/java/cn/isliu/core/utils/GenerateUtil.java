@@ -1,9 +1,9 @@
 package cn.isliu.core.utils;
 
+import cn.isliu.core.FileData;
 import cn.isliu.core.annotation.TableProperty;
-import cn.isliu.core.converters.FieldValueProcess;
 import cn.isliu.core.enums.BaseEnum;
-import cn.isliu.core.utils.StringUtil;
+import cn.isliu.core.enums.FileType;
 import org.jetbrains.annotations.Nullable;
 
 import java.lang.reflect.Field;
@@ -437,11 +437,23 @@ public class GenerateUtil {
         return newObject;
     }
 
-    public static Object getFieldValueList(Object fieldValue) {
-        Map<String, Object> params = new HashMap<>();
-        params.put("values", fieldValue);
-        params.put("type", "multipleValue");
-        return params;
+    public static Object getRowData(Object fieldValue) {
+        if (fieldValue instanceof FileData) {
+            FileData fileData = (FileData) fieldValue;
+            if (Objects.equals(fileData.getFileType(), FileType.IMAGE.getType())) {
+                return null;
+            } else if (Objects.equals(fileData.getFileType(), FileType.FILE.getType())) {
+                return fileData.getFileUrl();
+            }
+        }
+
+        if (fieldValue instanceof List) {
+            Map<String, Object> params = new HashMap<>();
+            params.put("values", fieldValue);
+            params.put("type", "multipleValue");
+            return params;
+        }
+        return fieldValue;
     }
 
     public static <T> @Nullable String getUniqueId(T data) {

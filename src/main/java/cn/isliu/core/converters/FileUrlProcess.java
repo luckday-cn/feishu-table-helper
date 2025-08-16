@@ -1,7 +1,8 @@
 package cn.isliu.core.converters;
 
+import cn.isliu.core.FileData;
 import cn.isliu.core.client.FsClient;
-import cn.isliu.core.config.FsConfig;
+import cn.isliu.core.enums.ErrorCode;
 import cn.isliu.core.utils.FsApiUtil;
 import cn.isliu.core.utils.FileUtil;
 import com.google.gson.JsonArray;
@@ -14,8 +15,6 @@ import java.util.UUID;
 import cn.isliu.core.logging.FsLogger;
 
 public class FileUrlProcess implements FieldValueProcess<String> {
-
-    // 使用统一的FsLogger替代java.util.logging.Logger
 
     @Override
     public String process(Object value) {
@@ -43,16 +42,27 @@ public class FileUrlProcess implements FieldValueProcess<String> {
     }
 
     @Override
-    public String reverseProcess(Object value) {
-        boolean cover = FsConfig.getInstance().isCover();
-        if (!cover && value != null) {
-            String str = value.toString();
-            byte[] imageData = FileUtil.getImageData(str);
-        }
+    public Object reverseProcess(Object value) {
         if (value == null) {
             return null;
+        } else {
+            if (value instanceof String) {
+                String path = value.toString();
+                try {
+                    FileData fileData = new FileData();
+                    fileData.setFileUrl( path);
+                    fileData.setFileType(FileUtil.isImageFile(path) ? "image" : "file");
+                    fileData.setFileName(FileUtil.getFileName(path));
+                    fileData.setImageData(FileUtil.getImageData(path));
+                    return fileData;
+                } catch (Exception e) {
+                    FsLogger.error(ErrorCode.BUSINESS_LOGIC_ERROR,"【飞书表格】 文件上传-文件URL处理异常!" + e.getMessage(),  path, e);
+                    return value;
+                }
+            } else {
+                return value;
+            }
         }
-        return value.toString();
     }
 
     private synchronized String getUrlByTextFile(JsonObject jsb) {

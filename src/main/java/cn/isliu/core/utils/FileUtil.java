@@ -7,6 +7,7 @@ import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.file.Files;
+import java.nio.file.Paths;
 
 public class FileUtil {
 
@@ -117,5 +118,36 @@ public class FileUtil {
         }
         
         return tempDir;
+    }
+
+    /**
+     * 判断文件是否为图片类型
+     *
+     * @param filePath 文件路径，可以是URL或本地路径
+     * @return 如果是图片类型返回true，否则返回false
+     */
+    public static boolean isImageFile(String filePath) {
+        if (filePath == null || filePath.isEmpty()) {
+            return false;
+        }
+
+        // 常见的图片文件扩展名
+        String[] imageExtensions = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".svg", ".ico"};
+        
+        // 转换为小写进行比较
+        String path = filePath.toLowerCase();
+        
+        // 检查URL或本地路径是否以图片扩展名结尾
+        for (String extension : imageExtensions) {
+            if (path.endsWith(extension)) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+
+    public static String getFileName(String path) {
+        return Paths.get(path).getFileName().toString();
     }
 }

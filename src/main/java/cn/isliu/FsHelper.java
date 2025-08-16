@@ -1,11 +1,15 @@
 package cn.isliu;
 
 import cn.isliu.core.BaseEntity;
+import cn.isliu.core.FileData;
 import cn.isliu.core.FsTableData;
 import cn.isliu.core.Sheet;
 import cn.isliu.core.client.FeishuClient;
 import cn.isliu.core.client.FsClient;
 import cn.isliu.core.config.FsConfig;
+import cn.isliu.core.enums.ErrorCode;
+import cn.isliu.core.enums.FileType;
+import cn.isliu.core.logging.FsLogger;
 import cn.isliu.core.pojo.FieldProperty;
 import cn.isliu.core.service.CustomValueService;
 import cn.isliu.core.utils.*;
@@ -137,6 +141,7 @@ public class FsHelper {
         // 初始化批量插入对象
         CustomValueService.ValueRequest.BatchPutValuesBuilder resultValuesBuilder = CustomValueService.ValueRequest.batchPutValues();
 
+        List<FileData> fileDataList = new ArrayList<>();
         FsConfig fsConfig = FsConfig.getInstance();
 
         AtomicInteger rowCount = new AtomicInteger(row[0] + 1);
@@ -155,8 +160,19 @@ public class FsHelper {
                     }
 
                     String position = titlePostionMap.get(field);
+
+                    if (fieldValue instanceof FileData) {
+                        FileData fileData = (FileData) fieldValue;
+                        String fileType = fileData.getFileType();
+                        if (fileType.equals(FileType.IMAGE.getType())) {
+                            fileData.setSheetId(sheetId);
+                            fileData.setSpreadsheetToken(spreadsheetToken);
+                            fileData.setPosition(position + rowNum.get());
+                            fileDataList.add(fileData);
+                        }
+                    }
                     resultValuesBuilder.addRange(sheetId, position + rowNum.get(), position + rowNum.get())
-                            .addRow(fieldValue instanceof List ? GenerateUtil.getFieldValueList(fieldValue) : fieldValue);
+                            .addRow(GenerateUtil.getRowData(fieldValue));
                 });
             } else {
                 int rowCou = rowCount.incrementAndGet();
@@ -166,9 +182,15 @@ public class FsHelper {
                     }
 
                     String position = titlePostionMap.get(field);
+                    if (fieldValue instanceof FileData) {
+                        FileData fileData = (FileData) fieldValue;
+                        fileData.setSheetId(sheetId);
+                        fileData.setSpreadsheetToken(spreadsheetToken);
+                        fileData.setPosition(position + rowCou);
+                        fileDataList.add(fileData);
+                    }
                     resultValuesBuilder.addRange(sheetId, position + rowCou, position + rowCou)
-                            .addRow(fieldValue instanceof List ? GenerateUtil.getFieldValueList(fieldValue) : fieldValue);
-
+                            .addRow(GenerateUtil.getRowData(fieldValue));
                 });
             }
         }
@@ -179,6 +201,16 @@ public class FsHelper {
             FsApiUtil.addRowColumns(sheetId, spreadsheetToken, "ROWS", rowTotal - rowNum, client);
         }
 
-        return FsApiUtil.batchPutValues(sheetId, spreadsheetToken, resultValuesBuilder.build(), client);
+        Object resp = FsApiUtil.batchPutValues(sheetId, spreadsheetToken, resultValuesBuilder.build(), client);
+
+        fileDataList.forEach(fileData -> {
+            try {
+                FsApiUtil.imageUpload(fileData.getImageData(), fileData.getFileName(), fileData.getPosition(), fileData.getSheetId(), fileData.getSpreadsheetToken(), client);
+            } catch (Exception e) {
+                FsLogger.error(ErrorCode.BUSINESS_LOGIC_ERROR, "【飞书表格】 文件上传-文件上传异常! " + fileData.getFileUrl());
+            }
+        });
+
+        return resp;
     }
 }
