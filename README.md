@@ -38,7 +38,7 @@ implementation 'cn.isliu:feishu-table-helper:0.0.1'
 
 ```java
 // 初始化配置
-FsConfig.initConfig("your_app_id", "your_app_secret");
+FsClient.getInstance().initializeClient("your_app_id", "your_app_secret");
 ```
 
 ### 2. 创建实体类
@@ -62,7 +62,7 @@ public class Employee extends BaseEntity {
 
 ```java
 // 根据实体类创建表格
-FsHelper.create("员工表", "your_spreadsheet_token", Employee.class);
+String sheetId = FsHelper.create("员工表", "your_spreadsheet_token", Employee.class);
 ```
 
 ### 4. 写入数据
