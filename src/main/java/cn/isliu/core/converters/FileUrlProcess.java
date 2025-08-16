@@ -1,7 +1,8 @@
 package cn.isliu.core.converters;
 
+import cn.isliu.core.client.FsClient;
+import cn.isliu.core.config.FsConfig;
 import cn.isliu.core.utils.FsApiUtil;
-import cn.isliu.core.utils.FsClientUtil;
 import cn.isliu.core.utils.FileUtil;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -10,12 +11,11 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import cn.isliu.core.logging.FsLogger;
 
 public class FileUrlProcess implements FieldValueProcess<String> {
 
-    private static final Logger log = Logger.getLogger(FileUrlProcess.class.getName());
+    // 使用统一的FsLogger替代java.util.logging.Logger
 
     @Override
     public String process(Object value) {
@@ -44,7 +44,11 @@ public class FileUrlProcess implements FieldValueProcess<String> {
 
     @Override
     public String reverseProcess(Object value) {
-        // 简单实现，可以根据需要进行更复杂的反向处理
+        boolean cover = FsConfig.getInstance().isCover();
+        if (!cover && value != null) {
+            String str = value.toString();
+            byte[] imageData = FileUtil.getImageData(str);
+        }
         if (value == null) {
             return null;
         }
@@ -83,20 +87,20 @@ public class FileUrlProcess implements FieldValueProcess<String> {
 
         boolean isSuccess = true;
         try {
-            FsApiUtil.downloadMaterial(fileToken, filePath , FsClientUtil.getFeishuClient(), null);
+            FsApiUtil.downloadMaterial(fileToken, filePath , FsClient.getInstance().getClient(), null);
             url = filePath;
         } catch (Exception e) {
-            log.log(Level.WARNING,"【飞书表格】 根据文件FileToken下载失败！fileToken: {0}, e: {1}", new Object[]{fileToken, e.getMessage()});
+            FsLogger.warn("【飞书表格】 根据文件FileToken下载失败！fileToken: {}, e: {}", fileToken, e.getMessage());
             isSuccess = false;
         }
 
         if (!isSuccess) {
-            String tmpUrl = FsApiUtil.downloadTmpMaterialUrl(fileToken, FsClientUtil.getFeishuClient());
+            String tmpUrl = FsApiUtil.downloadTmpMaterialUrl(fileToken, FsClient.getInstance().getClient());
             // 根据临时下载地址下载
             FileUtil.downloadFile(tmpUrl, filePath);
         }
 
-        log.info("【飞书表格】 文件上传-飞书图片上传成功！fileToken: " + fileToken + ", filePath: " + filePath);
+        FsLogger.info("【飞书表格】 文件上传-飞书图片上传成功！fileToken: {}, filePath: {}", fileToken, filePath);
         return url;
     }
 
@@ -110,19 +114,19 @@ public class FileUrlProcess implements FieldValueProcess<String> {
 
         boolean isSuccess = true;
         try {
-            FsApiUtil.downloadMaterial(token, path , FsClientUtil.getFeishuClient(), null);
+            FsApiUtil.downloadMaterial(token, path , FsClient.getInstance().getClient(), null);
             url = path;
         } catch (Exception e) {
-            log.log(Level.WARNING, "【飞书表格】 附件-根据文件FileToken下载失败！fileToken: {0}, e: {1}", new Object[]{token, e.getMessage()});
+            FsLogger.warn("【飞书表格】 附件-根据文件FileToken下载失败！fileToken: {}, e: {}", token, e.getMessage());
             isSuccess = false;
         }
 
         if (!isSuccess) {
-            String tmpUrl = FsApiUtil.downloadTmpMaterialUrl(token, FsClientUtil.getFeishuClient());
+            String tmpUrl = FsApiUtil.downloadTmpMaterialUrl(token, FsClient.getInstance().getClient());
             FileUtil.downloadFile(tmpUrl, path);
         }
 
-        log.info("【飞书表格】 文件上传-附件上传成功！fileToken: " + token + ", filePath: " + path);
+        FsLogger.info("【飞书表格】 文件上传-附件上传成功！fileToken: {}, filePath: {}", token, path);
         return url;
     }
 }

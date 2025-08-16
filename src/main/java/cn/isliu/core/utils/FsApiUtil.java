@@ -7,6 +7,7 @@ import cn.isliu.core.SheetMeta;
 import cn.isliu.core.ValuesBatch;
 import cn.isliu.core.client.FeishuClient;
 import cn.isliu.core.exception.FsHelperException;
+import cn.isliu.core.logging.FsLogger;
 import cn.isliu.core.pojo.ApiResponse;
 import cn.isliu.core.service.*;
 import com.google.gson.Gson;
@@ -25,8 +26,8 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.logging.Logger;
-import java.util.logging.Level;
+import cn.isliu.core.logging.FsLogger;
+import cn.isliu.core.enums.ErrorCode;
 
 
 /**
@@ -37,7 +38,7 @@ import java.util.logging.Level;
 public class FsApiUtil {
 
     private static final Gson gson = new Gson();
-    private static final Logger log = Logger.getLogger(FsApiUtil.class.getName());
+    // 使用统一的FsLogger替代java.util.logging.Logger
     private static final String REQ_TYPE = "JSON_STR";
     public static final int DEFAULT_ROW_NUM = 1000;
 
@@ -71,11 +72,11 @@ public class FsApiUtil {
             if (batchRangeResp.success()) {
                 valuesBatch = gson.fromJson(gson.toJson(batchRangeResp.getData()), ValuesBatch.class);
             } else {
-                log.log(Level.SEVERE, "【飞书表格】获取Sheet数据失败！ 错误信息：{0}", gson.toJson(batchRangeResp));
+                FsLogger.error(ErrorCode.API_CALL_FAILED, "【飞书表格】获取Sheet数据失败！ 错误信息：" + gson.toJson(batchRangeResp));
                 throw new FsHelperException("【飞书表格】获取Sheet数据失败！");
             }
         } catch (Exception e) {
-            log.log(Level.SEVERE, "【飞书表格】获取Sheet数据失败！ 错误信息：{0}", e.getMessage());
+            FsLogger.error(ErrorCode.API_CALL_FAILED, "【飞书表格】获取Sheet数据失败！ 错误信息：" + e.getMessage(), "getSheetData", e);
             throw new FsHelperException("【飞书表格】获取Sheet数据失败！");
         }
         return valuesBatch;
@@ -115,12 +116,12 @@ public class FsApiUtil {
 
                 return sheet.get();
             } else {
-                log.log(Level.SEVERE, "【飞书表格】 获取Sheet元数据异常！错误信息：{0}", gson.toJson(resp));
+                FsLogger.error(ErrorCode.API_CALL_FAILED, "【飞书表格】 获取Sheet元数据异常！错误信息：" + gson.toJson(resp));
                 throw new FsHelperException("【飞书表格】 获取Sheet元数据异常！错误信息：" + resp.getMsg());
             }
 
         } catch (Exception e) {
-            log.log(Level.SEVERE, "【飞书表格】 获取Sheet元数据异常！错误信息：{0}", e.getMessage());
+            FsLogger.error(ErrorCode.API_CALL_FAILED, "【飞书表格】 获取Sheet元数据异常！错误信息：" + e.getMessage(), "getSheetMeta", e);
             throw new FsHelperException("【飞书表格】 获取Sheet元数据异常！");
         }
     }
@@ -145,11 +146,11 @@ public class FsApiUtil {
             ApiResponse batchMergeResp = client.customCells().cellsBatchUpdate(spreadsheetToken, batchMergeRequest);
 
             if (!batchMergeResp.success()) {
-                log.log(Level.SEVERE, "【飞书表格】 合并单元格请求异常！参数：{0}，错误信息：{1}", new Object[]{cell, batchMergeResp.getMsg()});
+                FsLogger.warn("【飞书表格】 合并单元格请求异常！参数：{}，错误信息：{}", cell, batchMergeResp.getMsg());
                 throw new FsHelperException("【飞书表格】 合并单元格请求异常！");
             }
         } catch (Exception e) {
-            log.log(Level.SEVERE, "【飞书表格】 合并单元格异常！参数：{0}，错误信息：{1}", new Object[]{cell, e.getMessage()});
+            FsLogger.warn("【飞书表格】 合并单元格异常！参数：{}，错误信息：{}", cell, e.getMessage());
             throw new FsHelperException("【飞书表格】 合并单元格异常！");
         }
     }
@@ -167,11 +168,11 @@ public class FsApiUtil {
 
             ApiResponse apiResponse = client.customValues().valueBatchUpdate(spreadsheetToken, batchValueRequest);
             if (!apiResponse.success()) {
-                log.log(Level.SEVERE, "【飞书表格】 写入表格头数据异常！错误信息：{0}", apiResponse.getMsg());
+                FsLogger.warn("【飞书表格】 写入表格头数据异常！错误信息：{}", apiResponse.getMsg());
                 throw new FsHelperException("【飞书表格】 写入表格头数据异常！");
             }
         } catch (Exception e) {
-            log.log(Level.SEVERE, "【飞书表格】 写入表格头异常！错误信息：{0}", e.getMessage());
+            FsLogger.warn("【飞书表格】 写入表格头异常！错误信息：{}", e.getMessage());
             throw new FsHelperException("【飞书表格】 写入表格头异常！");
         }
     }
@@ -186,11 +187,11 @@ public class FsApiUtil {
 
             ApiResponse apiResponse = client.customCells().cellsBatchUpdate(spreadsheetToken, batchUpdateRequest);
             if (!apiResponse.success()) {
-                log.log(Level.SEVERE, "【飞书表格】 写入表格样式数据异常！参数：{0}，错误信息：{1}", new Object[]{style, apiResponse.getMsg()});
+                FsLogger.warn("【飞书表格】 写入表格样式数据异常！参数：{}，错误信息：{}", style, apiResponse.getMsg());
                 throw new FsHelperException("【飞书表格】 写入表格样式数据异常！");
             }
         } catch (Exception e) {
-            log.log(Level.SEVERE, "【飞书表格】 写入表格样式异常！参数：{0}，错误信息：{1}", new Object[]{style, e.getMessage()});
+            FsLogger.warn("【飞书表格】 写入表格样式异常！参数：{}，错误信息：{}", style, e.getMessage());
             throw new FsHelperException("【飞书表格】 写入表格样式异常！");
         }
     }
@@ -209,7 +210,7 @@ public class FsApiUtil {
             ApiResponse addResp = client.customSheets().sheetsBatchUpdate(spreadsheetToken, addSheetRequest);
 
             if (addResp.success()) {
-                log.log(Level.INFO, "【飞书表格】 创建 sheet 成功！ {0}", gson.toJson(addResp));
+                FsLogger.info("【飞书表格】 创建 sheet 成功！ {}", gson.toJson(addResp));
 
                 JsonObject jsObj = gson.fromJson(gson.toJson(addResp.getData()), JsonObject.class);
                 JsonArray replies = jsObj.getAsJsonArray("replies");
@@ -218,16 +219,16 @@ public class FsApiUtil {
                 Reply reply = gson.fromJson(jsonObject, Reply.class);
                 sheetId = reply.getAddSheet().getProperties().getSheetId();
                 if (sheetId == null || sheetId.isEmpty()) {
-                    log.log(Level.SEVERE, "【飞书表格】 创建 sheet 失败！");
+                    FsLogger.warn("【飞书表格】 创建 sheet 失败！");
                     throw new FsHelperException("【飞书表格】创建 sheet 异常！SheetId返回为空！");
                 }
             } else {
-                log.log(Level.SEVERE, "【飞书表格】 创建 sheet 失败！错误信息：{0}", gson.toJson(addResp));
+                FsLogger.warn("【飞书表格】 创建 sheet 失败！错误信息：{}", gson.toJson(addResp));
                 throw new FsHelperException("【飞书表格】 创建 sheet 异常！");
             }
         } catch (Exception e) {
             String message = e.getMessage();
-            log.log(Level.SEVERE, "【飞书表格】 创建 sheet 异常！错误信息：{0}", message);
+            FsLogger.warn("【飞书表格】 创建 sheet 异常！错误信息：{}", message);
 
             throw new FsHelperException(message != null && message.contains("403")? "请按照上方操作，当前智投无法操作对应文档哦" : "【飞书表格】 创建 sheet 异常！");
         }
@@ -248,7 +249,7 @@ public class FsApiUtil {
             ApiResponse copyResp = client.customSheets().sheetsBatchUpdate(spreadsheetToken, copyRequest);
 
             if (copyResp.success()) {
-                log.log(Level.INFO, "【飞书表格】 复制 sheet 成功！ {0}", gson.toJson(copyResp));
+                FsLogger.info("【飞书表格】 复制 sheet 成功！ {}", gson.toJson(copyResp));
 
                 JsonObject jsObj = gson.fromJson(gson.toJson(copyResp.getData()), JsonObject.class);
                 JsonArray replies = jsObj.getAsJsonArray("replies");
@@ -262,7 +263,7 @@ public class FsApiUtil {
                 }
             }
         } catch (Exception e) {
-            log.log(Level.SEVERE, "【飞书表格】 复制模版异常！错误信息：{0}", e.getMessage());
+            FsLogger.warn("【飞书表格】 复制模版异常！错误信息：{}", e.getMessage());
             throw new FsHelperException("【飞书表格】 复制模版异常！");
         }
         return sheetId;
@@ -287,10 +288,10 @@ public class FsApiUtil {
             ApiResponse batchStyleResp = client.customCells().cellsBatchUpdate(spreadsheetToken, batchStyleRequest);
 
             if (!batchStyleResp.success()) {
-                log.log(Level.SEVERE, "【飞书表格】 写入表格样式数据异常！参数：{0}，错误信息：{1}", new Object[]{conf, batchStyleResp.getMsg()});
+                FsLogger.warn("【飞书表格】 写入表格样式数据异常！参数：{}，错误信息：{}", conf, batchStyleResp.getMsg());
             }
         } catch (Exception e) {
-            log.log(Level.SEVERE, "【飞书表格】 写入表格样式数据异常！", e);
+            FsLogger.warn("【飞书表格】 写入表格样式数据异常！{}", e.getMessage());
         }
     }
 
@@ -314,10 +315,10 @@ public class FsApiUtil {
             ApiResponse response = client.customDataValidations().dataValidationBatchUpdate(spreadsheetToken, batchRequest);
 
             if (!response.success()) {
-                log.log(Level.SEVERE, "设置下拉列表失败， sheetId:{0}, startPosition:{1}, endPosition: {2}, 返回信息:{3}", new Object[]{sheetId, startPosition, endPosition, gson.toJson(response)});
+                FsLogger.warn("设置下拉列表失败， sheetId:{}, startPosition:{}, endPosition: {}, 返回信息:{}", sheetId, startPosition, endPosition, gson.toJson(response));
             }
         } catch (Exception e) {
-            log.log(Level.SEVERE, "设置下拉列表失败，sheetId:{0}", new Object[]{sheetId});
+            FsLogger.warn("设置下拉列表失败，sheetId:{}", sheetId);
         }
     }
 
@@ -332,10 +333,10 @@ public class FsApiUtil {
             ApiResponse deleteResp = client.customSheets().sheetsBatchUpdate(spreadsheetToken, deleteRequest);
 
             if (!deleteResp.success()) {
-                log.log(Level.SEVERE, "【飞书表格】 删除 sheet 失败！参数：{0}，错误信息：{1}", new Object[]{sheetId, deleteResp.getMsg()});
+                FsLogger.warn("【飞书表格】 删除 sheet 失败！参数：{}，错误信息：{}", sheetId, deleteResp.getMsg());
             }
         } catch (Exception e) {
-            log.log(Level.SEVERE, "【飞书表格】 删除 sheet 异常！参数：{0}，错误信息：{1}", new Object[]{sheetId, e.getMessage()});
+            FsLogger.warn("【飞书表格】 删除 sheet 异常！参数：{}，错误信息：{}", sheetId, e.getMessage());
         }
     }
 
@@ -358,7 +359,7 @@ public class FsApiUtil {
             }
 
         } catch (Exception e) {
-            log.log(Level.SEVERE, "【飞书表格】 下载素材异常！参数：{0}，错误信息：{1}", new Object[]{fileToken, e.getMessage()});
+            FsLogger.warn("【飞书表格】 下载素材异常！参数：{}，错误信息：{}", fileToken, e.getMessage());
             throw new FsHelperException("【飞书表格】 下载素材异常！");
         }
     }
@@ -375,16 +376,16 @@ public class FsApiUtil {
             if (resp.success()) {
                 return resp.getData().getTmpDownloadUrls()[0].getTmpDownloadUrl();
             } else {
-                log.log(Level.SEVERE, "【飞书表格】 获取临时下载地址失败！参数：{0}，错误信息：{1}", new Object[]{fileToken, gson.toJson(resp)});
+                FsLogger.warn("【飞书表格】 获取临时下载地址失败！参数：{}，错误信息：{}", fileToken, gson.toJson(resp));
             }
         } catch (Exception e) {
-            log.log(Level.SEVERE, "【飞书表格】 获取临时下载地址异常！参数：{0}，错误信息：{1}", new Object[]{fileToken, e.getMessage()});
+            FsLogger.warn("【飞书表格】 获取临时下载地址异常！参数：{}，错误信息：{}", fileToken, e.getMessage());
         }
         return tmpUrl;
     }
 
     public static Object putValues(String spreadsheetToken, CustomValueService.ValueRequest putValuesBuilder, FeishuClient client) {
-        log.log(Level.INFO, "【飞书表格】 putValues 开始写入数据！参数：{0}", gson.toJson(putValuesBuilder));
+        FsLogger.info("【飞书表格】 putValues 开始写入数据！参数：{}", gson.toJson(putValuesBuilder));
 
         // 添加到批量请求中
         CustomValueService.ValueBatchUpdateRequest putDataRequest = CustomValueService.ValueBatchUpdateRequest.newBuilder()
@@ -396,11 +397,11 @@ public class FsApiUtil {
             if (putResp.success()) {
                 return putResp.getData();
             } else {
-                log.log(Level.SEVERE, "【飞书表格】 写入表格数据失败！参数：{0}，错误信息：{1}", new Object[]{putValuesBuilder, putResp.getMsg()});
+                FsLogger.warn("【飞书表格】 写入表格数据失败！参数：{}，错误信息：{}", putValuesBuilder, putResp.getMsg());
                 throw new FsHelperException("【飞书表格】 写入表格数据失败！");
             }
         } catch (IOException e) {
-            log.log(Level.SEVERE, "【飞书表格】 写入表格数据异常！参数：{0}，错误信息：{1}", new Object[]{spreadsheetToken, e.getMessage()});
+            FsLogger.warn("【飞书表格】 写入表格数据异常！参数：{}，错误信息：{}", spreadsheetToken, e.getMessage());
             throw new FsHelperException("【飞书表格】 写入表格数据异常！");
         }
     }
@@ -408,7 +409,7 @@ public class FsApiUtil {
     public static Object batchPutValues(String sheetId, String spreadsheetToken,
                                         CustomValueService.ValueRequest batchPutRequest, FeishuClient client) {
 
-        log.log(Level.INFO, "【飞书表格】 batchPutValues 开始写入数据！参数：{0}", gson.toJson(batchPutRequest));
+        FsLogger.info("【飞书表格】 batchPutValues 开始写入数据！参数：{}", gson.toJson(batchPutRequest));
 
         try {
             CustomValueService.ValueBatchUpdateRequest batchPutDataRequest =
@@ -420,11 +421,11 @@ public class FsApiUtil {
             if (batchPutResp.success()) {
                 return batchPutResp.getData();
             } else {
-                log.log(Level.SEVERE, "【飞书表格】 批量写入数据失败！参数：{0}，错误信息：{1}", new Object[]{sheetId, gson.toJson(batchPutResp)});
+                FsLogger.warn("【飞书表格】 批量写入数据失败！参数：{}，错误信息：{}", sheetId, gson.toJson(batchPutResp));
                 throw new FsHelperException("【飞书表格】 批量写入数据失败！");
             }
         } catch (Exception e) {
-            log.log(Level.SEVERE, "【飞书表格】 批量写入数据异常！参数：{0}，错误信息：{1}", new Object[]{sheetId, e.getMessage()});
+            FsLogger.warn("【飞书表格】 批量写入数据异常！参数：{}，错误信息：{}", sheetId, e.getMessage());
             throw new FsHelperException("【飞书表格】 批量写入数据异常！");
         }
     }
@@ -443,11 +444,11 @@ public class FsApiUtil {
             if (batchResp.success()) {
                 return batchResp.getData();
             } else {
-                log.log(Level.SEVERE, "【飞书表格】 添加行列失败！参数：{0}，错误信息：{1}", new Object[]{sheetId, gson.toJson(batchResp)});
+                FsLogger.warn("【飞书表格】 添加行列失败！参数：{}，错误信息：{}", sheetId, gson.toJson(batchResp));
                 throw new FsHelperException("【飞书表格】 添加行列失败！");
             }
         } catch (IOException e) {
-            log.log(Level.SEVERE, "【飞书表格】 添加行列异常！参数：{0}，错误信息：{1}", new Object[]{sheetId, e.getMessage()});
+            FsLogger.warn("【飞书表格】 添加行列异常！参数：{}，错误信息：{}", sheetId, e.getMessage());
             throw new FsHelperException("【飞书表格】 添加行列异常！");
         }
     }
@@ -466,10 +467,10 @@ public class FsApiUtil {
             if (resp.success()) {
                 return resp.getData();
             } else {
-                log.log(Level.SEVERE, "【飞书表格】 获取表格信息失败！参数：{0}，错误信息：{1}", new Object[]{sheetId, resp.getMsg()});
+                FsLogger.warn("【飞书表格】 获取表格信息失败！参数：{}，错误信息：{}", sheetId, resp.getMsg());
             }
         } catch (Exception e) {
-            log.log(Level.SEVERE, "【飞书表格】 获取表格信息异常！参数：{0}，错误信息：{1}", new Object[]{sheetId, e.getMessage()});
+            FsLogger.warn("【飞书表格】 获取表格信息异常！参数：{}，错误信息：{}", sheetId, e.getMessage());
         }
         return null;
     }
@@ -487,11 +488,11 @@ public class FsApiUtil {
 
             ApiResponse apiResponse = client.customCells().cellsBatchUpdate(spreadsheetToken, batchUpdateRequest);
             if (!apiResponse.success()) {
-                log.log(Level.SEVERE, "【飞书表格】 设置单元格类型失败！参数：{0}，错误信息：{1}", new Object[]{sheetId, apiResponse.getMsg()});
+                FsLogger.warn("【飞书表格】 设置单元格类型失败！参数：{}，错误信息：{}", sheetId, apiResponse.getMsg());
                 throw new FsHelperException("【飞书表格】 批量设置单元格类型失败！");
             }
         } catch (Exception e) {
-            log.log(Level.SEVERE, "【飞书表格】 设置单元格类型失败！参数：{0}，错误信息：{1}", new Object[]{sheetId, e.getMessage()});
+            FsLogger.warn("【飞书表格】 设置单元格类型失败！参数：{}，错误信息：{}", sheetId, e.getMessage());
             throw new FsHelperException("【飞书表格】 批量设置单元格类型异常！");
         }
     }
@@ -513,11 +514,11 @@ public class FsApiUtil {
             ApiResponse imageResp = client.customValues().valueBatchUpdate(spreadsheetToken, imageWriteRequest);
 
             if (!imageResp.success()) {
-                log.log(Level.SEVERE, "【飞书表格】 图片上传失败！参数：{0}，错误信息：{1}", new Object[]{filePath, gson.toJson(imageResp)});
+                FsLogger.warn("【飞书表格】 图片上传失败！参数：{}，错误信息：{}", filePath, gson.toJson(imageResp));
             }
             return imageResp.getData();
         } catch (Exception e) {
-            log.log(Level.SEVERE, "【飞书表格】 图片上传异常！参数：{0}，错误信息：{1}", new Object[]{filePath, e.getMessage()});
+            FsLogger.warn("【飞书表格】 图片上传异常！参数：{}，错误信息：{}", filePath, e.getMessage());
         }
 
         return null;

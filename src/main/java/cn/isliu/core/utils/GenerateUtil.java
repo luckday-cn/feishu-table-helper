@@ -11,8 +11,8 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.math.BigDecimal;
 import java.util.*;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import cn.isliu.core.logging.FsLogger;
+import cn.isliu.core.enums.ErrorCode;
 import java.util.stream.Collectors;
 
 /**
@@ -23,7 +23,7 @@ import java.util.stream.Collectors;
  */
 public class GenerateUtil {
 
-    private static final Logger log = Logger.getLogger(GenerateUtil.class.getName());
+    // 使用统一的FsLogger替代java.util.logging.Logger
 
     /**
      * 根据配置和数据生成DTO对象（通用版本）
@@ -49,7 +49,7 @@ public class GenerateUtil {
                 try {
                     setNestedField(t, fieldPath, value);
                 } catch (Exception e) {
-                    log.log(Level.SEVERE, "【巨量广告助手】 获取字段值异常！参数：{0}，异常：{1}", new Object[]{fieldPath, e.getMessage()});
+                    FsLogger.error(ErrorCode.DATA_CONVERSION_ERROR, "【巨量广告助手】 获取字段值异常！参数：" + fieldPath + "，异常：" + e.getMessage(), "generateList", e);
                 }
             }
         });
@@ -129,7 +129,7 @@ public class GenerateUtil {
                     field.set(target, nestedObj);
                 } catch (InstantiationException e) {
                     // 如果无法创建实例，则记录日志并跳过该字段
-                    log.log(Level.WARNING, "无法创建嵌套对象实例: " + field.getType().getName() + ", 字段: " + fieldName, e);
+                    FsLogger.warn("无法创建嵌套对象实例: {} , 字段: {}", field.getType().getName(), fieldName);
                     return;
                 }
             }
@@ -153,7 +153,7 @@ public class GenerateUtil {
                     return elementClass.getDeclaredConstructor().newInstance();
                 } catch (Exception e) {
                     // 如果无法创建实例，则记录日志并返回null
-                    log.log(Level.WARNING, "无法创建List元素实例: " + elementClass.getName(), e);
+                    FsLogger.warn("无法创建List元素实例: {}", elementClass.getName());
                     return null;
                 }
             }
@@ -354,7 +354,7 @@ public class GenerateUtil {
                     result.put(fieldName, value);
                 }
             } catch (Exception e) {
-                log.log(Level.WARNING, "获取字段值异常，字段路径：" + fieldPath, e);
+                FsLogger.warn("获取字段值异常，字段路径：{}", fieldPath);
             }
         }
         return result;

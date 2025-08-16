@@ -2,6 +2,8 @@ package cn.isliu.core.utils;
 
 import cn.isliu.core.*;
 import cn.isliu.core.annotation.TableProperty;
+import cn.isliu.core.client.FsClient;
+
 import cn.isliu.core.config.FsConfig;
 import cn.isliu.core.converters.OptionsValueProcess;
 import cn.isliu.core.enums.BaseEnum;
@@ -51,7 +53,7 @@ public class FsTableUtil {
             // 3. 获取工作表数据
             ValuesBatch valuesBatch = FsApiUtil.getSheetData(sheet.getSheetId(), spreadsheetToken,
                     "A" + startRowIndex,
-                    getColumnName(colCount - 1) + endRowIndex, FsClientUtil.getFeishuClient());
+                    getColumnName(colCount - 1) + endRowIndex, FsClient.getInstance().getClient());
             if (valuesBatch != null) {
                 List<ValueRange> valueRanges = valuesBatch.getValueRanges();
                 for (ValueRange valueRange : valueRanges) {
@@ -66,12 +68,12 @@ public class FsTableUtil {
         List<FsTableData> dataList = getFsTableData(tableData);
         Map<String, String> titleMap = new HashMap<>();
 
-        dataList.stream().filter(d -> d.getRow() == (FsConfig.getTitleLine() - 1)).findFirst()
+        dataList.stream().filter(d -> d.getRow() == (FsConfig.getInstance().getTitleLine() - 1)).findFirst()
                 .ifPresent(d -> {
                     Map<String, String> map = (Map<String, String>) d.getData();
                     titleMap.putAll(map);
                 });
-        return dataList.stream().filter(fsTableData -> fsTableData.getRow() >= FsConfig.getHeadLine()).map(item -> {
+        return dataList.stream().filter(fsTableData -> fsTableData.getRow() >= FsConfig.getInstance().getHeadLine()).map(item -> {
             Map<String, Object> resultMap = new HashMap<>();
 
             Map<String, Object> map = (Map<String, Object>) item.getData();
@@ -264,8 +266,8 @@ public class FsTableUtil {
 
         Map<String, String> resultMap = new TreeMap<>();
         ValuesBatch valuesBatch = FsApiUtil.getSheetData(sheet.getSheetId(), spreadsheetToken,
-                "A" + FsConfig.getTitleLine(),
-                getColumnName(colCount - 1) + FsConfig.getTitleLine(), FsClientUtil.getFeishuClient());
+                "A" + FsConfig.getInstance().getTitleLine(),
+                getColumnName(colCount - 1) + FsConfig.getInstance().getTitleLine(), FsClient.getInstance().getClient());
         if (valuesBatch != null) {
             List<ValueRange> valueRanges = valuesBatch.getValueRanges();
             if (valueRanges != null && !valueRanges.isEmpty()) {
@@ -298,10 +300,10 @@ public class FsTableUtil {
                         position = FsTableUtil.getColumnNameByNuNumber(i + 1);
                     }
                 }
-                int line = FsConfig.getTitleLine() + 1;
+                int line = FsConfig.getInstance().getTitleLine() + 1;
 
                 if (tableProperty.enumClass() != BaseEnum.class) {
-                    FsApiUtil.setOptions(sheetId, FsClientUtil.getFeishuClient(), spreadsheetToken, tableProperty.type() == TypeEnum.MULTI_SELECT, position + line, position + 200,
+                    FsApiUtil.setOptions(sheetId, FsClient.getInstance().getClient(), spreadsheetToken, tableProperty.type() == TypeEnum.MULTI_SELECT, position + line, position + 200,
                             Arrays.stream(tableProperty.enumClass().getEnumConstants()).map(BaseEnum::getDesc).collect(Collectors.toList()));
                 }
 
@@ -315,7 +317,7 @@ public class FsTableUtil {
                         throw new RuntimeException(e);
                     }
 
-                    FsApiUtil.setOptions(sheetId, FsClientUtil.getFeishuClient(), spreadsheetToken, tableProperty.type() == TypeEnum.MULTI_SELECT, position + line, position + 200,
+                    FsApiUtil.setOptions(sheetId, FsClient.getInstance().getClient(), spreadsheetToken, tableProperty.type() == TypeEnum.MULTI_SELECT, position + line, position + 200,
                             result);
                 }
             }
@@ -333,7 +335,8 @@ public class FsTableUtil {
         String colorTemplate = "{\"data\": [{\"style\": {\"font\": {\"bold\": true, \"clean\": false, \"italic\": false, \"fontSize\": \"10pt/1.5\"}, \"clean\": false, \"hAlign\": 1, \"vAlign\": 1, \"backColor\": \"#000000\", \"foreColor\": \"#ffffff\", \"formatter\": \"\", \"borderType\": \"FULL_BORDER\", \"borderColor\": \"#000000\", \"textDecoration\": 0}, \"ranges\": [\"SHEET_ID!RANG\"]}]}";
         colorTemplate = colorTemplate.replace("SHEET_ID", sheetId);
         colorTemplate = colorTemplate.replace("RANG", "A1:" + FsTableUtil.getColumnNameByNuNumber(size) + "1");
-        colorTemplate = colorTemplate.replace("FORE_COLOR", FsConfig.FORE_COLOR).replace("BACK_COLOR", FsConfig.BACK_COLOR);
+        colorTemplate = colorTemplate.replace("FORE_COLOR", FsConfig.getInstance().getForeColor())
+                .replace("BACK_COLOR", FsConfig.getInstance().getBackColor());
         return colorTemplate;
     }
 }

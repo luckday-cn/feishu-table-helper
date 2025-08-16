@@ -11,8 +11,8 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 import java.util.*;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import cn.isliu.core.logging.FsLogger;
+import cn.isliu.core.enums.ErrorCode;
 import java.util.stream.Collectors;
 
 import java.lang.reflect.InvocationTargetException;
@@ -24,7 +24,7 @@ import java.lang.reflect.InvocationTargetException;
  * 支持不同字段类型的转换处理
  */
 public class ConvertFieldUtil {
-    private static final Logger log = Logger.getLogger(ConvertFieldUtil.class.getName());
+    // 使用统一的FsLogger替代java.util.logging.Logger
     private static final Gson gson = new Gson();
 
     /**
@@ -226,15 +226,15 @@ public class ConvertFieldUtil {
                     FieldValueProcess fieldValueProcess = fieldFormatClass.getDeclaredConstructor().newInstance();
                     result = fieldValueProcess.process(result);
                 } catch (InstantiationException e) {
-                    log.log(Level.SEVERE, "无法实例化字段格式化类: " + fieldFormatClass.getName(), e);
+                    FsLogger.error(ErrorCode.DATA_CONVERSION_ERROR, "无法实例化字段格式化类: " + fieldFormatClass.getName(), "convertFieldValue", e);
                 } catch (IllegalAccessException e) {
-                    log.log(Level.SEVERE, "无法访问字段格式化类的构造函数: " + fieldFormatClass.getName(), e);
+                    FsLogger.error(ErrorCode.DATA_CONVERSION_ERROR, "无法访问字段格式化类的构造函数: " + fieldFormatClass.getName(), "convertFieldValue", e);
                 } catch (NoSuchMethodException e) {
-                    log.log(Level.SEVERE, "字段格式化类缺少无参构造函数: " + fieldFormatClass.getName(), e);
+                    FsLogger.error(ErrorCode.DATA_CONVERSION_ERROR, "字段格式化类缺少无参构造函数: " + fieldFormatClass.getName(), "convertFieldValue", e);
                 } catch (InvocationTargetException e) {
-                    log.log(Level.SEVERE, "字段格式化类构造函数调用异常: " + fieldFormatClass.getName(), e);
+                    FsLogger.error(ErrorCode.DATA_CONVERSION_ERROR, "字段格式化类构造函数调用异常: " + fieldFormatClass.getName(), "convertFieldValue", e);
                 } catch (Exception e) {
-                    log.log(Level.SEVERE, "创建字段格式化类实例时发生未知异常: " + fieldFormatClass.getName(), e);
+                    FsLogger.error(ErrorCode.DATA_CONVERSION_ERROR, "创建字段格式化类实例时发生未知异常: " + fieldFormatClass.getName(), "convertFieldValue", e);
                 }
             }
         }
@@ -258,7 +258,7 @@ public class ConvertFieldUtil {
                     FieldValueProcess fieldValueProcess = fieldFormatClass.newInstance();
                     result = fieldValueProcess.reverseProcess(result);
                 } catch (InstantiationException | IllegalAccessException e) {
-                    log.log(Level.FINE, "format value error", e);
+                    FsLogger.debug("format value error: {}", e.getMessage());
                 }
             }
         }
