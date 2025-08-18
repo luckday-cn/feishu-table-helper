@@ -1,6 +1,5 @@
 package cn.isliu.core.service;
 
-import cn.isliu.core.client.FeishuApiClient;
 import cn.isliu.core.client.FeishuClient;
 import cn.isliu.core.pojo.ApiResponse;
 import okhttp3.Request;
@@ -13,7 +12,7 @@ import java.util.List;
 /**
  * 自定义表格服务 提供官方SDK未覆盖的表格API
  */
-public class CustomSheetService extends FeishuApiClient {
+public class CustomSheetService extends AbstractFeishuApiService {
 
     /**
      * 构造函数

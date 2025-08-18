@@ -1,5 +1,6 @@
-package cn.isliu.core.client;
+package cn.isliu.core.service;
 
+import cn.isliu.core.client.FeishuClient;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.lark.oapi.core.utils.Jsons;
@@ -12,7 +13,7 @@ import java.util.Map;
 /**
  * 飞书API客户端抽象类 提供基础的HTTP请求处理和认证逻辑
  */
-public abstract class FeishuApiClient {
+public abstract class AbstractFeishuApiService {
     protected final FeishuClient feishuClient;
     protected final OkHttpClient httpClient;
     protected final Gson gson;
@@ -25,7 +26,7 @@ public abstract class FeishuApiClient {
      * 
      * @param feishuClient 飞书客户端
      */
-    public FeishuApiClient(FeishuClient feishuClient) {
+    public AbstractFeishuApiService(FeishuClient feishuClient) {
         this.feishuClient = feishuClient;
         this.httpClient = feishuClient.getHttpClient();
         this.gson = Jsons.DEFAULT;

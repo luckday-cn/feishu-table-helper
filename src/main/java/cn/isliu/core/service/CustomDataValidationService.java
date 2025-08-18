@@ -4,7 +4,6 @@ package cn.isliu.core.service;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 
-import cn.isliu.core.client.FeishuApiClient;
 import cn.isliu.core.client.FeishuClient;
 import cn.isliu.core.pojo.ApiResponse;
 import java.io.IOException;
@@ -16,7 +15,7 @@ import java.util.List;
 /**
  * 自定义数据验证服务 提供官方SDK未覆盖的数据验证API
  */
-public class CustomDataValidationService extends FeishuApiClient {
+public class CustomDataValidationService extends AbstractFeishuApiService {
 
     /**
      * 构造函数

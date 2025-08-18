@@ -1,6 +1,5 @@
 package cn.isliu.core.service;
 
-import cn.isliu.core.client.FeishuApiClient;
 import cn.isliu.core.client.FeishuClient;
 import cn.isliu.core.pojo.ApiResponse;
 import okhttp3.Request;
@@ -13,7 +12,7 @@ import java.util.List;
 /**
  * 自定义维度服务 提供官方SDK未覆盖的行列操作API
  */
-public class CustomDimensionService extends FeishuApiClient {
+public class CustomDimensionService extends AbstractFeishuApiService {
 
     /**
      * 构造函数

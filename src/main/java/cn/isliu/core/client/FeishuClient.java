@@ -173,7 +173,7 @@ public class FeishuClient {
      * 
      * @return OkHttp客户端实例
      */
-    OkHttpClient getHttpClient() {
+    public OkHttpClient getHttpClient() {
         return httpClient;
     }
 
