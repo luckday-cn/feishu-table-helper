@@ -151,12 +151,12 @@
 <!--                <version>2.5.3</version>-->
 <!--            </plugin>-->
 <!--            -->
-<!--            &lt;!&ndash; exec plugin for running tests &ndash;&gt;-->
-<!--            <plugin>-->
-<!--                <groupId>org.codehaus.mojo</groupId>-->
-<!--                <artifactId>exec-maven-plugin</artifactId>-->
-<!--                <version>3.1.0</version>-->
-<!--            </plugin>-->
+            <!-- exec plugin for running tests -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.1.0</version>
+            </plugin>
         </plugins>
     </build>
 

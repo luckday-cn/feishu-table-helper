@@ -1,5 +1,6 @@
 package cn.isliu.core.utils;
 
+import cn.isliu.core.annotation.TableConf;
 import cn.isliu.core.annotation.TableProperty;
 import cn.isliu.core.converters.FieldValueProcess;
 import cn.isliu.core.converters.OptionsValueProcess;
@@ -95,7 +96,9 @@ public class PropertyUtil {
                 // 检查字段是否有@TableProperty注解
                 if (field.isAnnotationPresent(TableProperty.class)) {
                     TableProperty tableProperty = field.getAnnotation(TableProperty.class);
-                    String[] propertyValues = tableProperty.value().split("\\."); // 支持多个值
+                    String[] values = tableProperty.value();
+                    String value = values[values.length - 1];
+                    String[] propertyValues = value.split("\\."); // 支持多个值
                     String propertyValue = (propertyValues.length > 0 && !propertyValues[0].isEmpty()) ? propertyValues[0] : field.getName();
 
                     processFieldForMap(field, propertyValue, keyPrefix, valuePrefix, result, depthMap, fieldsWithChildren, parentHasAnnotation);
@@ -150,8 +153,13 @@ public class PropertyUtil {
             }
 
             @Override
-            public String value() {
-                return value;
+            public String[] value() {
+                return new String[]{value};
+            }
+
+            @Override
+            public String desc() {
+                return "";
             }
 
             @Override
@@ -361,5 +369,54 @@ public class PropertyUtil {
                 .sorted(Comparator.comparingInt(entry -> entry.getValue().getTableProperty().order()))
                 .map(Map.Entry::getKey)
                 .collect(Collectors.toList());
+    }
+
+    public static <T> TableConf getTableConf(Class<T> clazz) {
+        TableConf tableConf;
+        if (clazz.isAnnotationPresent(TableConf.class)) {
+            tableConf = clazz.getAnnotation(TableConf.class);
+        } else {
+            tableConf = new TableConf() {
+                @Override
+                public Class<? extends Annotation> annotationType() {
+                    return TableConf.class;
+                }
+
+                @Override
+                public int headLine() {
+                    return 1;
+                }
+
+                @Override
+                public int titleRow() {
+                    return 1;
+                }
+
+                @Override
+                public boolean enableCover() {
+                    return false;
+                }
+
+                @Override
+                public boolean isText() {
+                    return false;
+                }
+                @Override
+                public boolean enableDesc() {
+                    return false;
+                }
+
+                @Override
+                public String headFontColor() {
+                    return "#ffffff";
+                }
+
+                @Override
+                public String headBackColor() {
+                    return "#000000";
+                }
+            };
+        }
+        return tableConf;
     }
 }

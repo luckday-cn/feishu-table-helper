@@ -23,7 +23,14 @@ public @interface TableProperty {
      * 
      * @return 列名字符串
      */
-    String value() default "";
+    String[] value() default {};
+
+    /**
+     * 字段描述
+     *
+     * @return 字段描述字符串或字符串数组
+     */
+    String desc() default  "";
 
     /**
      * 字段名

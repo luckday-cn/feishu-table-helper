@@ -1,18 +1,22 @@
 package cn.isliu.core.utils;
 
 import cn.isliu.core.*;
+import cn.isliu.core.annotation.TableConf;
 import cn.isliu.core.annotation.TableProperty;
 import cn.isliu.core.client.FsClient;
 
-import cn.isliu.core.config.FsConfig;
 import cn.isliu.core.converters.OptionsValueProcess;
 import cn.isliu.core.enums.BaseEnum;
 import cn.isliu.core.enums.TypeEnum;
 import cn.isliu.core.pojo.FieldProperty;
 import cn.isliu.core.service.CustomValueService;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonParser;
+import com.google.gson.JsonSyntaxException;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 /**
@@ -32,7 +36,7 @@ public class FsTableUtil {
      * @param spreadsheetToken 电子表格Token
      * @return 飞书表格数据列表
      */
-    public static List<FsTableData> getFsTableData(Sheet sheet, String spreadsheetToken) {
+    public static List<FsTableData> getFsTableData(Sheet sheet, String spreadsheetToken, TableConf tableConf) {
 
         // 计算数据范围
         GridProperties gridProperties = sheet.getGridProperties();
@@ -68,12 +72,12 @@ public class FsTableUtil {
         List<FsTableData> dataList = getFsTableData(tableData);
         Map<String, String> titleMap = new HashMap<>();
 
-        dataList.stream().filter(d -> d.getRow() == (FsConfig.getInstance().getTitleLine() - 1)).findFirst()
+        dataList.stream().filter(d -> d.getRow() == (tableConf.titleRow() - 1)).findFirst()
                 .ifPresent(d -> {
                     Map<String, String> map = (Map<String, String>) d.getData();
                     titleMap.putAll(map);
                 });
-        return dataList.stream().filter(fsTableData -> fsTableData.getRow() >= FsConfig.getInstance().getHeadLine()).map(item -> {
+        return dataList.stream().filter(fsTableData -> fsTableData.getRow() >= tableConf.headLine()).map(item -> {
             Map<String, Object> resultMap = new HashMap<>();
 
             Map<String, Object> map = (Map<String, Object>) item.getData();
@@ -260,14 +264,14 @@ public class FsTableUtil {
         return columnName.toString();
     }
 
-    public static Map<String, String> getTitlePostionMap(Sheet sheet, String spreadsheetToken) {
+    public static Map<String, String> getTitlePostionMap(Sheet sheet, String spreadsheetToken, TableConf tableConf) {
         GridProperties gridProperties = sheet.getGridProperties();
         int colCount = gridProperties.getColumnCount();
 
         Map<String, String> resultMap = new TreeMap<>();
         ValuesBatch valuesBatch = FsApiUtil.getSheetData(sheet.getSheetId(), spreadsheetToken,
-                "A" + FsConfig.getInstance().getTitleLine(),
-                getColumnName(colCount - 1) + FsConfig.getInstance().getTitleLine(), FsClient.getInstance().getClient());
+                "A" + tableConf.titleRow(),
+                getColumnName(colCount - 1) + tableConf.titleRow(), FsClient.getInstance().getClient());
         if (valuesBatch != null) {
             List<ValueRange> valueRanges = valuesBatch.getValueRanges();
             if (valueRanges != null && !valueRanges.isEmpty()) {
@@ -288,8 +292,9 @@ public class FsTableUtil {
         return resultMap;
     }
 
-    public static void setTableOptions(String spreadsheetToken, List<String> headers, Map<String, FieldProperty> fieldsMap, String sheetId) {
+    public static void setTableOptions(String spreadsheetToken, List<String> headers, Map<String, FieldProperty> fieldsMap, String sheetId, boolean enableDesc) {
         List<Object> list = Arrays.asList(headers.toArray());
+        int line = getMaxLevel(fieldsMap) + (enableDesc ? 2 : 1);
         fieldsMap.forEach((field, fieldProperty) -> {
             TableProperty tableProperty = fieldProperty.getTableProperty();
             String position = "";
@@ -300,7 +305,6 @@ public class FsTableUtil {
                         position = FsTableUtil.getColumnNameByNuNumber(i + 1);
                     }
                 }
-                int line = FsConfig.getInstance().getTitleLine() + 1;
 
                 if (tableProperty.enumClass() != BaseEnum.class) {
                     FsApiUtil.setOptions(sheetId, FsClient.getInstance().getClient(), spreadsheetToken, tableProperty.type() == TypeEnum.MULTI_SELECT, position + line, position + 200,
@@ -324,19 +328,116 @@ public class FsTableUtil {
         });
     }
 
-    public static CustomValueService.ValueRequest getHeadTemplateBuilder(String sheetId, List<String> headers) {
-        CustomValueService.ValueRequest.BatchPutValuesBuilder batchPutValuesBuilder = CustomValueService.ValueRequest.batchPutValues();
-        batchPutValuesBuilder.addRange(sheetId + "!A1:" + FsTableUtil.getColumnNameByNuNumber(headers.size()) + "1");
-        batchPutValuesBuilder.addRow(headers.toArray());
+    public static CustomValueService.ValueRequest getHeadTemplateBuilder(String sheetId, List<String> headers, 
+                  Map<String, FieldProperty> fieldsMap, TableConf tableConf) {
+        
+        String position = FsTableUtil.getColumnNameByNuNumber(headers.size());
+
+        CustomValueService.ValueRequest.BatchPutValuesBuilder batchPutValuesBuilder 
+                = CustomValueService.ValueRequest.batchPutValues();
+
+        // 获取父级表头
+//        int maxLevel = getMaxLevel(fieldsMap);
+//
+//        Map<Integer, List<String>> levelListMap = groupFieldsByLevel(fieldsMap);
+//        for (int i = maxLevel; i >= 1; i--) {
+//            List<String> values = levelListMap.get(i);
+//            batchPutValuesBuilder.addRange(sheetId + "!A" + i + ":" + position + i);
+//
+//        }
+//
+//        int titleRow = maxLevel;
+
+        int titleRow = tableConf.titleRow();
+        if (tableConf.enableDesc()) {
+            int descRow = titleRow + 1;
+            batchPutValuesBuilder.addRange(sheetId + "!A" + titleRow + ":" + position + descRow);
+            batchPutValuesBuilder.addRow(headers.toArray());
+            batchPutValuesBuilder.addRow(getDescArray(headers, fieldsMap));
+        } else {
+            batchPutValuesBuilder.addRange(sheetId + "!A" + titleRow + ":" + position + titleRow);
+            batchPutValuesBuilder.addRow(headers.toArray());
+        }
+       
         return batchPutValuesBuilder.build();
     }
 
-    public static String getDefaultTableStyle(String sheetId, int size) {
+    private static int getMaxLevel(Map<String, FieldProperty> fieldsMap) {
+        AtomicInteger maxLevel = new AtomicInteger(1);
+        fieldsMap.forEach((field, fieldProperty) -> {
+            TableProperty tableProperty = fieldProperty.getTableProperty();
+            String[] value = tableProperty.value();
+            if (value.length > maxLevel.get()) {
+                maxLevel.set(value.length);
+            }
+        });
+        return maxLevel.get();
+    }
+
+    private static Object[] getDescArray(List<String> headers, Map<String, FieldProperty> fieldsMap) {
+        Object[] descArray = new String[headers.size()];
+        for (int i = 0; i < headers.size(); i++) {
+            String header = headers.get(i);
+            FieldProperty fieldProperty = fieldsMap.get(header);
+            if (fieldProperty != null && fieldProperty.getTableProperty() != null) {
+                String desc = fieldProperty.getTableProperty().desc();
+                if (desc != null && !desc.isEmpty()) {
+                    try {
+                        JsonElement element = JsonParser.parseString(desc);
+                        if (element.isJsonObject()) {
+                            descArray[i] = element.getAsJsonObject();
+                        } else if (element.isJsonArray()) {
+                            descArray[i] = element.getAsJsonArray();
+                        } else {
+                            descArray[i] = desc;
+                        }
+                    } catch (JsonSyntaxException e) {
+                        descArray[i] = desc;
+                    }
+                } else {
+                    descArray[i] = null;
+                }
+            } else {
+                descArray[i] = null;
+            }
+        }
+        return descArray;
+    }
+
+    public static String getDefaultTableStyle(String sheetId, int size, TableConf tableConf) {
+        int row = tableConf.titleRow();
         String colorTemplate = "{\"data\": [{\"style\": {\"font\": {\"bold\": true, \"clean\": false, \"italic\": false, \"fontSize\": \"10pt/1.5\"}, \"clean\": false, \"hAlign\": 1, \"vAlign\": 1, \"backColor\": \"#000000\", \"foreColor\": \"#ffffff\", \"formatter\": \"\", \"borderType\": \"FULL_BORDER\", \"borderColor\": \"#000000\", \"textDecoration\": 0}, \"ranges\": [\"SHEET_ID!RANG\"]}]}";
         colorTemplate = colorTemplate.replace("SHEET_ID", sheetId);
-        colorTemplate = colorTemplate.replace("RANG", "A1:" + FsTableUtil.getColumnNameByNuNumber(size) + "1");
-        colorTemplate = colorTemplate.replace("FORE_COLOR", FsConfig.getInstance().getForeColor())
-                .replace("BACK_COLOR", FsConfig.getInstance().getBackColor());
+        colorTemplate = colorTemplate.replace("RANG", "A" + row + ":" + FsTableUtil.getColumnNameByNuNumber(size) + row);
+        colorTemplate = colorTemplate.replace("FORE_COLOR", tableConf.headFontColor())
+                .replace("BACK_COLOR", tableConf.headBackColor());
         return colorTemplate;
+    }
+
+    /**
+     * 根据层级分组字段属性
+     * 
+     * @param fieldsMap 字段属性映射
+     * @return 按层级分组的映射，key为层级，value为该层级的字段名数组
+     */
+    public static Map<Integer, List<String>> groupFieldsByLevel(Map<String, FieldProperty> fieldsMap) {
+        Map<Integer, List<String>> levelMap = new HashMap<>();
+        
+        for (Map.Entry<String, FieldProperty> entry : fieldsMap.entrySet()) {
+            FieldProperty fieldProperty = entry.getValue();
+            if (fieldProperty != null && fieldProperty.getTableProperty() != null) {
+                String[] values = fieldProperty.getTableProperty().value();
+                for (int i = 0; i < values.length; i++) {
+                    levelMap.computeIfAbsent(i, k -> new ArrayList<>()).add(values[i]);
+                }
+            }
+        }
+        
+        return levelMap;
+    }
+
+    public static void main(String[] args) {
+        String str ="支持1～3个搜索";
+        System.out.println(str.length());
     }
 }

@@ -64,6 +64,13 @@ public enum ErrorCode implements BaseEnum {
     TOKEN_EXPIRED("FS603", "Token expired", ErrorCategory.SECURITY),
     ENCRYPTION_FAILED("FS604", "Encryption failed", ErrorCategory.SECURITY),
     DECRYPTION_FAILED("FS605", "Decryption failed", ErrorCategory.SECURITY),
+    
+    // Token管理相关错误 (FS610-FS619)
+    TOKEN_MANAGEMENT_ERROR("FS610", "Token management error", ErrorCategory.SECURITY),
+    TOKEN_FETCH_FAILED("FS611", "Failed to fetch token from API", ErrorCategory.SECURITY),
+    TOKEN_PARSE_ERROR("FS612", "Failed to parse token response", ErrorCategory.SECURITY),
+    TOKEN_CACHE_ERROR("FS613", "Token cache operation failed", ErrorCategory.SECURITY),
+    TOKEN_REFRESH_FAILED("FS614", "Token refresh operation failed", ErrorCategory.SECURITY),
 
     // 业务逻辑相关错误 (FS700-FS799)
     BUSINESS_LOGIC_ERROR("FS700", "Business logic error", ErrorCategory.BUSINESS),
@@ -247,6 +254,8 @@ public enum ErrorCode implements BaseEnum {
             case API_SERVER_ERROR:
             case SERVICE_UNAVAILABLE:
             case CONNECTION_POOL_EXHAUSTED:
+            case TOKEN_FETCH_FAILED:
+            case TOKEN_REFRESH_FAILED:
                 return true;
             default:
                 return false;

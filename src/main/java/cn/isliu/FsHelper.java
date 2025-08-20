@@ -4,9 +4,9 @@ import cn.isliu.core.BaseEntity;
 import cn.isliu.core.FileData;
 import cn.isliu.core.FsTableData;
 import cn.isliu.core.Sheet;
+import cn.isliu.core.annotation.TableConf;
 import cn.isliu.core.client.FeishuClient;
 import cn.isliu.core.client.FsClient;
-import cn.isliu.core.config.FsConfig;
 import cn.isliu.core.enums.ErrorCode;
 import cn.isliu.core.enums.FileType;
 import cn.isliu.core.logging.FsLogger;
@@ -44,25 +44,26 @@ public class FsHelper {
         Map<String, FieldProperty> fieldsMap = PropertyUtil.getTablePropertyFieldsMap(clazz);
         List<String> headers = PropertyUtil.getHeaders(fieldsMap);
 
+        TableConf tableConf = PropertyUtil.getTableConf(clazz);
+
         FeishuClient client = FsClient.getInstance().getClient();
         // 1、创建sheet
         String sheetId = FsApiUtil.createSheet(sheetName, client, spreadsheetToken);
 
         // 2 添加表头数据
-        FsApiUtil.putValues(spreadsheetToken, FsTableUtil.getHeadTemplateBuilder(sheetId, headers), client);
+        FsApiUtil.putValues(spreadsheetToken, FsTableUtil.getHeadTemplateBuilder(sheetId, headers, fieldsMap, tableConf), client);
 
         // 3 设置表格样式
-        FsApiUtil.setTableStyle(FsTableUtil.getDefaultTableStyle(sheetId, headers.size()), sheetId, client, spreadsheetToken);
+        FsApiUtil.setTableStyle(FsTableUtil.getDefaultTableStyle(sheetId, headers.size(), tableConf), sheetId, client, spreadsheetToken);
 
         // 4 设置单元格为文本格式
-        FsConfig fsConfig = FsConfig.getInstance();
-        if (fsConfig.isCellText()) {
+        if (tableConf.isText()) {
             String column = FsTableUtil.getColumnNameByNuNumber(headers.size());
             FsApiUtil.setCellType(sheetId, "@", "A1", column + 200, client, spreadsheetToken);
         }
 
         // 5 设置表格下拉
-        FsTableUtil.setTableOptions(spreadsheetToken, headers, fieldsMap, sheetId);
+        FsTableUtil.setTableOptions(spreadsheetToken, headers, fieldsMap, sheetId, tableConf.enableDesc());
         return sheetId;
     }
 
@@ -82,7 +83,8 @@ public class FsHelper {
         List<T> results = new ArrayList<>();
         FeishuClient client = FsClient.getInstance().getClient();
         Sheet sheet = FsApiUtil.getSheetMetadata(sheetId, client, spreadsheetToken);
-        List<FsTableData> fsTableDataList = FsTableUtil.getFsTableData(sheet, spreadsheetToken);
+        TableConf tableConf = PropertyUtil.getTableConf(clazz);
+        List<FsTableData> fsTableDataList = FsTableUtil.getFsTableData(sheet, spreadsheetToken, tableConf);
 
         Map<String, FieldProperty> fieldsMap = PropertyUtil.getTablePropertyFieldsMap(clazz);
         List<String> fieldPathList = fieldsMap.values().stream().map(FieldProperty::getField).collect(Collectors.toList());
@@ -90,11 +92,15 @@ public class FsHelper {
         fsTableDataList.forEach(tableData -> {
             Object data = tableData.getData();
             if (data instanceof HashMap) {
-                JsonObject jsonObject = JSONUtil.convertHashMapToJsonObject((HashMap<String, Object>) data);
+                Map<String, Object> rowData = (HashMap<String, Object>) data;
+                JsonObject jsonObject = JSONUtil.convertMapToJsonObject(rowData);
                 Map<String, Object> dataMap = ConvertFieldUtil.convertPositionToField(jsonObject, fieldsMap);
                 T t = GenerateUtil.generateInstance(fieldPathList, clazz, dataMap);
                 if (t instanceof BaseEntity) {
-                    ((BaseEntity) t).setUniqueId(tableData.getUniqueId());
+                    BaseEntity baseEntity = (BaseEntity) t;
+                    baseEntity.setUniqueId(tableData.getUniqueId());
+                    baseEntity.setRow(tableData.getRow());
+                    baseEntity.setRowData(rowData);
                 }
                 results.add(t);
             }
@@ -120,10 +126,11 @@ public class FsHelper {
 
         Class<?> aClass = dataList.get(0).getClass();
         Map<String, FieldProperty> fieldsMap = PropertyUtil.getTablePropertyFieldsMap(aClass);
+        TableConf tableConf = PropertyUtil.getTableConf(aClass);
 
         FeishuClient client = FsClient.getInstance().getClient();
         Sheet sheet = FsApiUtil.getSheetMetadata(sheetId, client, spreadsheetToken);
-        List<FsTableData> fsTableDataList = FsTableUtil.getFsTableData(sheet, spreadsheetToken);
+        List<FsTableData> fsTableDataList = FsTableUtil.getFsTableData(sheet, spreadsheetToken, tableConf);
         Map<String, Integer> currTableRowMap = fsTableDataList.stream().collect(Collectors.toMap(FsTableData::getUniqueId, FsTableData::getRow));
 
         final Integer[] row = {0};
@@ -133,7 +140,7 @@ public class FsHelper {
             }
         });
 
-        Map<String, String> titlePostionMap = FsTableUtil.getTitlePostionMap(sheet, spreadsheetToken);
+        Map<String, String> titlePostionMap = FsTableUtil.getTitlePostionMap(sheet, spreadsheetToken, tableConf);
 
         Map<String, String> fieldMap = new HashMap<>();
         fieldsMap.forEach((field, fieldProperty) -> fieldMap.put(field, fieldProperty.getField()));
@@ -142,7 +149,6 @@ public class FsHelper {
         CustomValueService.ValueRequest.BatchPutValuesBuilder resultValuesBuilder = CustomValueService.ValueRequest.batchPutValues();
 
         List<FileData> fileDataList = new ArrayList<>();
-        FsConfig fsConfig = FsConfig.getInstance();
 
         AtomicInteger rowCount = new AtomicInteger(row[0] + 1);
 
@@ -155,7 +161,7 @@ public class FsHelper {
             if (uniqueId != null && rowNum.get() != null) {
                 rowNum.set(rowNum.get() + 1);
                 values.forEach((field, fieldValue) -> {
-                    if (!fsConfig.isCover() && fieldValue == null) {
+                    if (!tableConf.enableCover() && fieldValue == null) {
                         return;
                     }
 
@@ -177,7 +183,7 @@ public class FsHelper {
             } else {
                 int rowCou = rowCount.incrementAndGet();
                 values.forEach((field, fieldValue) -> {
-                    if (!fsConfig.isCover() && fieldValue == null) {
+                    if (!tableConf.enableCover() && fieldValue == null) {
                         return;
                     }
 

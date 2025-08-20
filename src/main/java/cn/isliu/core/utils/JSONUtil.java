@@ -1,8 +1,6 @@
 package cn.isliu.core.utils;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
+import com.google.gson.*;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -16,7 +14,7 @@ public class JSONUtil {
      * @param data HashMap数据
      * @return 转换后的JsonObject
      */
-    public static JsonObject convertHashMapToJsonObject(HashMap<String, Object> data) {
+    public static JsonObject convertMapToJsonObject(Map<String, Object> data) {
         JsonObject jsonObject = new JsonObject();
         for (Map.Entry<String, Object> entry : data.entrySet()) {
             String key = entry.getKey();
@@ -45,5 +43,14 @@ public class JSONUtil {
             }
         }
         return jsonObject;
+    }
+
+    public static boolean isValidJson(String json) {
+        try {
+            JsonParser.parseString(json);
+            return true;
+        } catch (JsonSyntaxException e) {
+            return false;
+        }
     }
 }

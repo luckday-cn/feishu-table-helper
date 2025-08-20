@@ -1040,6 +1040,11 @@ public class CustomValueService extends AbstractFeishuApiService {
                 return this;
             }
 
+            public BatchPutValuesBuilder setMajorDimension(String majorDimension) {
+                currentItem.setMajorDimension(majorDimension);
+                return this;
+            }
+
             /**
              * 构建向多个范围写入数据请求
              *
@@ -1620,6 +1625,7 @@ public class CustomValueService extends AbstractFeishuApiService {
     public static class ValueRangeItem {
         private String range;
         private String type;
+        private String majorDimension;
         private List<List<Object>> values;
 
         public ValueRangeItem() {
@@ -1642,6 +1648,14 @@ public class CustomValueService extends AbstractFeishuApiService {
          */
         public void setRange(String range) {
             this.range = range;
+        }
+
+        public String getMajorDimension() {
+            return majorDimension;
+        }
+
+        public void setMajorDimension(String majorDimension) {
+            this.majorDimension = majorDimension;
         }
 
         /**

@@ -89,7 +89,7 @@ public class FieldProperty {
      * 
      * @return 列名字符串
      */
-    public String getFieldName() {
+    public String[] getFieldName() {
         return tableProperty.value();
     }
 

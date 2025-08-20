@@ -1,6 +1,7 @@
 package cn.isliu.core.service;
 
 import cn.isliu.core.client.FeishuClient;
+import cn.isliu.core.exception.FsHelperException;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.lark.oapi.core.utils.Jsons;
@@ -17,6 +18,7 @@ public abstract class AbstractFeishuApiService {
     protected final FeishuClient feishuClient;
     protected final OkHttpClient httpClient;
     protected final Gson gson;
+    protected final TenantTokenManager tokenManager;
 
     protected static final String BASE_URL = "https://open.feishu.cn/open-apis";
     protected static final MediaType JSON_MEDIA_TYPE = MediaType.parse("application/json; charset=utf-8");
@@ -30,35 +32,22 @@ public abstract class AbstractFeishuApiService {
         this.feishuClient = feishuClient;
         this.httpClient = feishuClient.getHttpClient();
         this.gson = Jsons.DEFAULT;
+        this.tokenManager = new TenantTokenManager(feishuClient);
     }
 
     /**
      * 获取租户访问令牌
      * 
+     * 使用TenantTokenManager进行智能的token管理，包括缓存、过期检测和自动刷新。
+     * 
      * @return 访问令牌
      * @throws IOException 请求异常
      */
     protected String getTenantAccessToken() throws IOException {
-        Map<String, String> params = new HashMap<>();
-        params.put("app_id", feishuClient.getAppId());
-        params.put("app_secret", feishuClient.getAppSecret());
-
-        RequestBody body = RequestBody.create(gson.toJson(params), JSON_MEDIA_TYPE);
-
-        Request request =
-            new Request.Builder().url(BASE_URL + "/auth/v3/tenant_access_token/internal").post(body).build();
-
-        try (Response response = httpClient.newCall(request).execute()) {
-            if (!response.isSuccessful() || response.body() == null) {
-                throw new IOException("Failed to get tenant access token: " + response);
-            }
-
-            JsonObject jsonResponse = gson.fromJson(response.body().string(), JsonObject.class);
-            if (jsonResponse.has("tenant_access_token")) {
-                return jsonResponse.get("tenant_access_token").getAsString();
-            } else {
-                throw new IOException("Invalid token response: " + jsonResponse);
-            }
+        try {
+            return tokenManager.getCachedTenantAccessToken();
+        } catch (FsHelperException e) {
+            throw new IOException("Failed to get tenant access token: " + e.getMessage(), e);
         }
     }
 
