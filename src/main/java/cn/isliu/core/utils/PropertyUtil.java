@@ -408,12 +408,12 @@ public class PropertyUtil {
 
                 @Override
                 public String headFontColor() {
-                    return "#ffffff";
+                    return "#000000";
                 }
 
                 @Override
                 public String headBackColor() {
-                    return "#000000";
+                    return "#cccccc";
                 }
             };
         }

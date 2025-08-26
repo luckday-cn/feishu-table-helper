@@ -819,8 +819,8 @@ public class CustomCellService extends AbstractFeishuApiService {
         private String formatter= "";
         private Integer hAlign = 1;
         private Integer vAlign = 1;
-        private String foreColor = "#ffffff";
-        private String backColor = "#000000";
+        private String foreColor = "#000000";
+        private String backColor = "#cccccc";
         private String borderType = "FULL_BORDER";
         private String borderColor = "#6d6d6d";
         private Boolean clean = false;

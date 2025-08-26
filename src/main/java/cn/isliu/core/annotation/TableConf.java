@@ -49,12 +49,12 @@ public @interface TableConf {
      *
      * @return 字体颜色
      */
-    String headFontColor() default "#ffffff";
+    String headFontColor() default "#000000";
 
     /**
      * 背景颜色
      *
      * @return 背景颜色
      */
-    String headBackColor() default "#000000";
+    String headBackColor() default "#cccccc";
 }
