@@ -1,6 +1,5 @@
 package cn.isliu.core.service;
 
-
 import cn.isliu.core.client.FeishuClient;
 import cn.isliu.core.pojo.ApiResponse;
 import okhttp3.Request;
@@ -51,22 +50,15 @@ public class CustomCellService extends AbstractFeishuApiService {
             if (cellRequest.getMergeCells() != null) {
                 String url = BASE_URL + "/sheets/v2/spreadsheets/" + spreadsheetToken + "/merge_cells";
 
-                String params;
-
-                String type = cellRequest.getMergeCells().getType();
-                if (type != null && !type.isEmpty() && "JSON_STR".equals(type)) {
-                    params = cellRequest.getMergeCells().getParams();
-                } else {
-                    // 获取合并单元格范围
-                    String range = cellRequest.getMergeCells().getRange();
-                    if (range == null) {
-                        ApiResponse errorResponse = new ApiResponse();
-                        errorResponse.setCode(400);
-                        errorResponse.setMsg("Invalid cell range");
-                        return errorResponse;
-                    }
-                    params = gson.toJson(new MergeCellsRequestBody(range, cellRequest.getMergeCells().getMergeType()));
+                // 获取合并单元格范围
+                String range = cellRequest.getMergeCells().getRange();
+                if (range == null) {
+                    ApiResponse errorResponse = new ApiResponse();
+                    errorResponse.setCode(400);
+                    errorResponse.setMsg("Invalid cell range");
+                    return errorResponse;
                 }
+                String params = gson.toJson(new MergeCellsRequestBody(range, cellRequest.getMergeCells().getMergeType()));
 
                 // 构建合并单元格请求体
                 RequestBody body = RequestBody.create(params, JSON_MEDIA_TYPE);
@@ -133,32 +125,25 @@ public class CustomCellService extends AbstractFeishuApiService {
             else if (cellRequest.getStyleCellsBatch() != null) {
                 String url = BASE_URL + "/sheets/v2/spreadsheets/" + spreadsheetToken + "/styles_batch_update";
 
-                String type = cellRequest.getStyleCellsBatch().getType();
-                String params = "";
-                if (type != null && !type.isEmpty() && "JSON_STR".equals(type)) {
-                    params = cellRequest.getStyleCellsBatch().getParams();
-                } else {
-                    // 获取单元格范围和样式
-                    List<String> ranges = cellRequest.getStyleCellsBatch().getRanges();
-                    Style style = cellRequest.getStyleCellsBatch().getStyle();
+                // 获取单元格范围和样式
+                List<String> ranges = cellRequest.getStyleCellsBatch().getRanges();
+                Style style = cellRequest.getStyleCellsBatch().getStyle();
 
-                    if (ranges == null || ranges.isEmpty()) {
-                        ApiResponse errorResponse = new ApiResponse();
-                        errorResponse.setCode(400);
-                        errorResponse.setMsg("Invalid cell ranges");
-                        return errorResponse;
-                    }
-
-                    // 构建批量设置样式请求体
-                    StyleBatchUpdateRequest styleBatchRequest = new StyleBatchUpdateRequest();
-                    StyleBatchData styleBatchData = new StyleBatchData();
-                    styleBatchData.setRanges(ranges);
-                    styleBatchData.setStyle(style);
-                    styleBatchRequest.getData().add(styleBatchData);
-                    params = gson.toJson(styleBatchRequest);
+                if (ranges == null || ranges.isEmpty()) {
+                    ApiResponse errorResponse = new ApiResponse();
+                    errorResponse.setCode(400);
+                    errorResponse.setMsg("Invalid cell ranges");
+                    return errorResponse;
                 }
 
-                RequestBody body = RequestBody.create(params, JSON_MEDIA_TYPE);
+                // 构建批量设置样式请求体
+                StyleBatchUpdateRequest styleBatchRequest = new StyleBatchUpdateRequest();
+                StyleBatchData styleBatchData = new StyleBatchData();
+                styleBatchData.setRanges(ranges);
+                styleBatchData.setStyle(style);
+                styleBatchRequest.getData().add(styleBatchData);
+
+                RequestBody body = RequestBody.create(gson.toJson(styleBatchRequest), JSON_MEDIA_TYPE);
                 Request httpRequest = createAuthenticatedRequest(url, "PUT", body).build();
                 response = executeRequest(httpRequest, ApiResponse.class);
 
@@ -371,16 +356,6 @@ public class CustomCellService extends AbstractFeishuApiService {
                 request.setMergeCells(mergeCells);
             }
 
-            public MergeCellsBuilder setReqType(String reqType) {
-                mergeCells.setType(reqType);
-                return this;
-            }
-
-            public MergeCellsBuilder setReqParams(String reqParams) {
-                mergeCells.setParams(reqParams);
-                return this;
-            }
-
             /**
              * 设置要合并的单元格所在的工作表ID
              *
@@ -519,10 +494,7 @@ public class CustomCellService extends AbstractFeishuApiService {
         /**
          * 合并方式 可选值： MERGE_ALL：合并所有单元格 MERGE_ROWS：按行合并 MERGE_COLUMNS：按列合并
          */
-        private String mergeType;
-
-        private String type;
-        private String params;
+        private String mergeType = "MERGE_ALL";
 
         /**
          * 获取要合并的单元格范围
@@ -611,23 +583,6 @@ public class CustomCellService extends AbstractFeishuApiService {
          */
         public void setMergeType(String mergeType) {
             this.mergeType = mergeType;
-        }
-
-
-        public String getType() {
-            return type;
-        }
-
-        public void setType(String type) {
-            this.type = type;
-        }
-
-        public String getParams() {
-            return params;
-        }
-
-        public void setParams(String params) {
-            this.params = params;
         }
     }
 
@@ -859,16 +814,16 @@ public class CustomCellService extends AbstractFeishuApiService {
      * 单元格样式
      */
     public static class Style {
-        private Font font;
-        private Integer textDecoration;
-        private String formatter;
-        private Integer hAlign;
-        private Integer vAlign;
-        private String foreColor;
-        private String backColor;
-        private String borderType;
-        private String borderColor;
-        private Boolean clean;
+        private Font font = new Font();
+        private Integer textDecoration = 0;
+        private String formatter= "";
+        private Integer hAlign = 1;
+        private Integer vAlign = 1;
+        private String foreColor = "#ffffff";
+        private String backColor = "#000000";
+        private String borderType = "FULL_BORDER";
+        private String borderColor = "#6d6d6d";
+        private Boolean clean = false;
 
         /**
          * 获取字体样式
@@ -1056,10 +1011,10 @@ public class CustomCellService extends AbstractFeishuApiService {
      * 字体样式
      */
     public static class Font {
-        private Boolean bold;
-        private Boolean italic;
-        private String fontSize;
-        private Boolean clean;
+        private Boolean bold = true;
+        private Boolean italic = false;
+        private String fontSize = "10pt/1.5";
+        private Boolean clean = false;
 
         /**
          * 获取是否加粗
@@ -1778,8 +1733,6 @@ public class CustomCellService extends AbstractFeishuApiService {
         private List<String> ranges;
         private List<CellRange> cellRanges;
         private Style style;
-        private String type;
-        private String params;
 
         public StyleCellsBatchRequest() {
             this.ranges = new ArrayList<>();
@@ -1850,21 +1803,6 @@ public class CustomCellService extends AbstractFeishuApiService {
 
         public void setStyle(Style style) {
             this.style = style;
-        }
-
-        public String getType() {
-            return type;
-        }
-
-        public void setType(String type) {
-            this.type = type;
-        }
-
-        public String getParams() {
-            return params;
-        }
-        public void setParams(String params) {
-            this.params = params;
         }
     }
 
@@ -1966,16 +1904,6 @@ public class CustomCellService extends AbstractFeishuApiService {
             style = new Style();
             styleCellsBatch.setStyle(style);
             request.setStyleCellsBatch(styleCellsBatch);
-        }
-
-        public StyleCellsBatchBuilder setReqType(String reqType) {
-            styleCellsBatch.setType(reqType);
-            return this;
-        }
-
-        public StyleCellsBatchBuilder setParams(String params) {
-            styleCellsBatch.setParams(params);
-            return this;
         }
 
         /**

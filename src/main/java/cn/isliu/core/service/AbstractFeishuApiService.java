@@ -45,7 +45,7 @@ public abstract class AbstractFeishuApiService {
      */
     protected String getTenantAccessToken() throws IOException {
         try {
-            return tokenManager.getCachedTenantAccessToken();
+            return tokenManager.getTenantAccessToken();
         } catch (FsHelperException e) {
             throw new IOException("Failed to get tenant access token: " + e.getMessage(), e);
         }

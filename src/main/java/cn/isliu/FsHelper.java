@@ -11,6 +11,7 @@ import cn.isliu.core.enums.ErrorCode;
 import cn.isliu.core.enums.FileType;
 import cn.isliu.core.logging.FsLogger;
 import cn.isliu.core.pojo.FieldProperty;
+import cn.isliu.core.service.CustomCellService;
 import cn.isliu.core.service.CustomValueService;
 import cn.isliu.core.utils.*;
 import com.google.gson.JsonObject;
@@ -54,7 +55,13 @@ public class FsHelper {
         FsApiUtil.putValues(spreadsheetToken, FsTableUtil.getHeadTemplateBuilder(sheetId, headers, fieldsMap, tableConf), client);
 
         // 3 设置表格样式
-        FsApiUtil.setTableStyle(FsTableUtil.getDefaultTableStyle(sheetId, headers.size(), tableConf), sheetId, client, spreadsheetToken);
+        FsApiUtil.setTableStyle(FsTableUtil.getDefaultTableStyle(sheetId, fieldsMap, tableConf), client, spreadsheetToken);
+
+        // 4 合并单元格
+        List<CustomCellService.CellRequest> mergeCell = FsTableUtil.getMergeCell(sheetId, fieldsMap);
+        if (!mergeCell.isEmpty()) {
+            mergeCell.forEach(cell ->  FsApiUtil.mergeCells(cell, client, spreadsheetToken));
+        }
 
         // 4 设置单元格为文本格式
         if (tableConf.isText()) {
@@ -84,9 +91,10 @@ public class FsHelper {
         FeishuClient client = FsClient.getInstance().getClient();
         Sheet sheet = FsApiUtil.getSheetMetadata(sheetId, client, spreadsheetToken);
         TableConf tableConf = PropertyUtil.getTableConf(clazz);
-        List<FsTableData> fsTableDataList = FsTableUtil.getFsTableData(sheet, spreadsheetToken, tableConf);
 
         Map<String, FieldProperty> fieldsMap = PropertyUtil.getTablePropertyFieldsMap(clazz);
+        List<FsTableData> fsTableDataList = FsTableUtil.getFsTableData(sheet, spreadsheetToken, tableConf);
+
         List<String> fieldPathList = fieldsMap.values().stream().map(FieldProperty::getField).collect(Collectors.toList());
 
         fsTableDataList.forEach(tableData -> {

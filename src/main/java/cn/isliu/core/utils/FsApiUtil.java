@@ -125,22 +125,38 @@ public class FsApiUtil {
         }
     }
 
-    public static void setTableStyle(String style, String sheetId, FeishuClient client, String spreadsheetToken) {
+    public static void setTableStyle(CustomCellService.StyleCellsBatchBuilder styleCellsBatchBuilder, FeishuClient client, String spreadsheetToken) {
         try {
             CustomCellService.CellBatchUpdateRequest batchUpdateRequest = CustomCellService.CellBatchUpdateRequest.newBuilder()
-                    .addRequest(CustomCellService.CellRequest.styleCellsBatch().setReqType(REQ_TYPE)
-                            .setParams(style.replaceAll("%SHEET_ID%", sheetId))
-                            .build())
+                    .addRequest(styleCellsBatchBuilder.build())
                     .build();
 
             ApiResponse apiResponse = client.customCells().cellsBatchUpdate(spreadsheetToken, batchUpdateRequest);
             if (!apiResponse.success()) {
-                FsLogger.warn("【飞书表格】 写入表格样式数据异常！参数：{}，错误信息：{}", style, apiResponse.getMsg());
+                FsLogger.warn("【飞书表格】 写入表格样式数据异常！参数：{}，错误信息：{}", styleCellsBatchBuilder, apiResponse.getMsg());
                 throw new FsHelperException("【飞书表格】 写入表格样式数据异常！");
             }
         } catch (Exception e) {
-            FsLogger.warn("【飞书表格】 写入表格样式异常！参数：{}，错误信息：{}", style, e.getMessage());
+            FsLogger.warn("【飞书表格】 写入表格样式异常！参数：{}，错误信息：{}", styleCellsBatchBuilder, e.getMessage());
             throw new FsHelperException("【飞书表格】 写入表格样式异常！");
+        }
+    }
+
+    public static void mergeCells(CustomCellService.CellRequest cellRequest, FeishuClient client, String spreadsheetToken) {
+        try {
+            CustomCellService.CellBatchUpdateRequest batchMergeRequest = CustomCellService.CellBatchUpdateRequest.newBuilder()
+                    .addRequest(cellRequest)
+                    .build();
+
+            ApiResponse batchMergeResp = client.customCells().cellsBatchUpdate(spreadsheetToken, batchMergeRequest);
+
+            if (!batchMergeResp.success()) {
+                FsLogger.warn("【飞书表格】 合并单元格请求异常！参数：{}，错误信息：{}", cellRequest.toString(), batchMergeResp.getMsg());
+                throw new FsHelperException("【飞书表格】 合并单元格请求异常！");
+            }
+        } catch (Exception e) {
+            FsLogger.warn("【飞书表格】 合并单元格异常！参数：{}，错误信息：{}", cellRequest.toString(), e.getMessage(), e);
+            throw new FsHelperException("【飞书表格】 合并单元格异常！");
         }
     }
 
