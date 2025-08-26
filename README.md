@@ -22,14 +22,14 @@ feishu-table-helper 是一个简化飞书表格操作的 Java 库。通过使用
 <dependency>
     <groupId>cn.isliu</groupId>
     <artifactId>feishu-table-helper</artifactId>
-    <version>0.0.2</version>
+    <version>0.0.3</version>
 </dependency>
 ```
 
 ### Gradle
 
 ```gradle
-implementation 'cn.isliu:feishu-table-helper:0.0.2'
+implementation 'cn.isliu:feishu-table-helper:0.0.3'
 ```
 
 ## 快速开始
@@ -38,22 +38,29 @@ implementation 'cn.isliu:feishu-table-helper:0.0.2'
 
 ```java
 // 初始化配置
-FsClient.getInstance().initializeClient("your_app_id", "your_app_secret");
+try (FsClient fsClient = FsClient.getInstance()) {
+    fsClient.initializeClient("your_app_id","your_app_secret");
+}
 ```
 
 ### 2. 创建实体类
 
 ```java
+@TableConf(headLine = 3, titleRow = 2, enableDesc = true)
 public class Employee extends BaseEntity {
-    @TableProperty(value = "姓名", order = 1)
+
+    @TableProperty(value = {"ID", "员工信息", "员工编号"}, order = 0, desc = "员工编号不超过20个字符")
+    private String employeeId;
+
+    @TableProperty(value = {"ID", "员工信息", "姓名"}, order = 1, desc = "员工姓名不超过20个字符")
     private String name;
-    
-    @TableProperty(value = "邮箱", order = 2)
-    private String email;
-    
-    @TableProperty(value = "部门", order = 3)
+
+    @TableProperty(value = "部门", order = 3, desc = "员工部门不超过20个字符")
     private String department;
-    
+
+    @TableProperty(value = {"员工信息", "邮箱"}, order = 2, desc = "员工邮箱不超过50个字符")
+    private String email;
+
     // getters and setters...
 }
 ```
@@ -64,6 +71,8 @@ public class Employee extends BaseEntity {
 // 根据实体类创建表格
 String sheetId = FsHelper.create("员工表", "your_spreadsheet_token", Employee.class);
 ```
+
+![员工表](img/b3d92bda-8d51-4aa7-b66e-496cb2430802.png)
 
 ### 4. 写入数据
 
@@ -98,16 +107,17 @@ employees.forEach(emp -> System.out.println(emp.name + " - " + emp.email));
 - `fieldFormatClass()`: 字段格式化处理类
 - `optionsClass()`: 选项处理类
 
-## 配置选项
+### @TableConf
 
-通过 [FsConfig](file://../src/main/java/cn/isliu/core/config/FsConfig.java#L5-L55) 类可以配置以下选项：
+用于配置表格样式：
 
-- `headLine`: 表头行号
-- `titleLine`: 标题行号
-- `isCover`: 是否覆盖写入
-- `CELL_TEXT`: 是否设置单元格为文本格式
-- `FORE_COLOR`: 前景色
-- `BACK_COLOR`: 背景色
+- `headLine()`: 表头行数
+- `titleLine()`: 标题行数
+- `enableCover()`: 是否开启覆盖写入
+- `isText()`: 是否设置表格为纯文本
+- `headFontColor()`: 表头字体颜色
+- `headBackColor()`: 表头背景颜色
+- `enableDesc()`: 是否开启字段描述
 
 ## 依赖
 
