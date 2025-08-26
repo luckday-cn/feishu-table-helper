@@ -40,6 +40,8 @@ implementation 'cn.isliu:feishu-table-helper:0.0.3'
 // 初始化配置
 try (FsClient fsClient = FsClient.getInstance()) {
     fsClient.initializeClient("your_app_id","your_app_secret");
+    
+    // TODO 读写数据
 }
 ```
 
@@ -72,7 +74,7 @@ public class Employee extends BaseEntity {
 String sheetId = FsHelper.create("员工表", "your_spreadsheet_token", Employee.class);
 ```
 
-![员工表](img/b3d92bda-8d51-4aa7-b66e-496cb2430802.png)
+![员工表](img/b3d92bda-8d51-4aa7-b66e-496cb2430803.png)
 
 ### 4. 写入数据
 
