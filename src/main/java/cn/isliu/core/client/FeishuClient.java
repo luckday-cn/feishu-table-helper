@@ -117,6 +117,16 @@ public class FeishuClient {
     }
 
     /**
+     * 获取扩展文件服务
+     *
+     * @return 扩展文件服务
+     */
+    public CustomFileService customFiles() {
+        return serviceManager.getService(CustomFileService.class, () -> new CustomFileService(this));
+    }
+
+
+    /**
      * 获取官方客户端
      *
      * @return 官方Client实例

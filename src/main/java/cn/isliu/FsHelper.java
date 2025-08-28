@@ -5,6 +5,7 @@ import cn.isliu.core.FileData;
 import cn.isliu.core.FsTableData;
 import cn.isliu.core.Sheet;
 import cn.isliu.core.annotation.TableConf;
+import cn.isliu.core.builder.SheetBuilder;
 import cn.isliu.core.client.FeishuClient;
 import cn.isliu.core.client.FsClient;
 import cn.isliu.core.enums.ErrorCode;
@@ -72,6 +73,22 @@ public class FsHelper {
         // 5 设置表格下拉
         FsTableUtil.setTableOptions(spreadsheetToken, headers, fieldsMap, sheetId, tableConf.enableDesc());
         return sheetId;
+    }
+
+    /**
+     * 创建飞书表格构建器
+     *
+     * 返回一个表格构建器实例，支持链式调用和高级配置选项，
+     * 如字段过滤等功能。
+     *
+     * @param sheetName 工作表名称
+     * @param spreadsheetToken 电子表格Token
+     * @param clazz 实体类Class对象，用于解析表头和字段属性
+     * @param <T> 实体类泛型
+     * @return SheetBuilder实例，支持链式调用
+     */
+    public static <T> SheetBuilder<T> createBuilder(String sheetName, String spreadsheetToken, Class<T> clazz) {
+        return new SheetBuilder<>(sheetName, spreadsheetToken, clazz);
     }
 
 

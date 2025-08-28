@@ -9,18 +9,13 @@ import cn.isliu.core.client.FeishuClient;
 import cn.isliu.core.exception.FsHelperException;
 import cn.isliu.core.logging.FsLogger;
 import cn.isliu.core.pojo.ApiResponse;
+import cn.isliu.core.pojo.RootFolderMetaResponse;
 import cn.isliu.core.service.*;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import com.lark.oapi.service.drive.v1.model.BatchGetTmpDownloadUrlMediaReq;
-import com.lark.oapi.service.drive.v1.model.BatchGetTmpDownloadUrlMediaResp;
-import com.lark.oapi.service.drive.v1.model.DownloadMediaReq;
-import com.lark.oapi.service.drive.v1.model.DownloadMediaResp;
-import com.lark.oapi.service.sheets.v3.model.GetSpreadsheetReq;
-import com.lark.oapi.service.sheets.v3.model.GetSpreadsheetResp;
-import com.lark.oapi.service.sheets.v3.model.QuerySpreadsheetSheetReq;
-import com.lark.oapi.service.sheets.v3.model.QuerySpreadsheetSheetResp;
+import com.lark.oapi.service.drive.v1.model.*;
+import com.lark.oapi.service.sheets.v3.model.*;
 
 import java.io.IOException;
 import java.util.List;
@@ -157,6 +152,83 @@ public class FsApiUtil {
         } catch (Exception e) {
             FsLogger.warn("【飞书表格】 合并单元格异常！参数：{}，错误信息：{}", cellRequest.toString(), e.getMessage(), e);
             throw new FsHelperException("【飞书表格】 合并单元格异常！");
+        }
+    }
+
+    /**
+     * 获取根目录Token
+     *
+     * 调用飞书开放平台API获取当前租户的根目录token，用于后续的文件夹和文件操作
+     * API接口: GET https://open.feishu.cn/open-apis/drive/v1/files/root_folder/meta
+     *
+     * @param client 飞书客户端
+     * @return 根目录token，获取失败时抛出异常
+     */
+    public static String getRootFolderToken(FeishuClient client) {
+        try {
+            // 使用自定义文件服务获取根目录元数据
+            RootFolderMetaResponse response = client.customFiles().getRootFolderMeta();
+
+            if (response.isSuccess() && response.hasValidData()) {
+                String rootFolderToken = response.getData().getToken();
+                FsLogger.info("【飞书表格】 获取根目录Token成功！Token: {}", rootFolderToken);
+                return rootFolderToken;
+            } else {
+                FsLogger.warn("【飞书表格】 获取根目录Token失败！错误码：{}，错误信息：{}",
+                        response.getCode(), response.getMsg());
+                throw new FsHelperException("【飞书表格】 获取根目录Token失败！错误信息：" + response.getMsg());
+            }
+        } catch (Exception e) {
+            FsLogger.warn("【飞书表格】 获取根目录Token异常！错误信息：{}", e.getMessage(), e);
+            throw new FsHelperException("【飞书表格】 获取根目录Token异常！");
+        }
+    }
+
+    public static CreateFolderFileRespBody createFolder(String folderName, String folderToken, FeishuClient client) {
+        try {
+            // 创建请求对象
+            CreateFolderFileReq req = CreateFolderFileReq.newBuilder()
+                    .createFolderFileReqBody(CreateFolderFileReqBody.newBuilder()
+                            .name(folderName)
+                            .folderToken(folderToken)
+                            .build())
+                    .build();
+
+            // 发起请求
+            CreateFolderFileResp resp = client.drive().v1().file().createFolder(req);
+            if (resp.success()) {
+                FsLogger.info("【飞书表格】 创建文件夹成功！ {}", gson.toJson(resp));
+                return resp.getData();
+            } else {
+                FsLogger.warn("【飞书表格】 创建文件夹失败！参数：{}，错误信息：{}", String.format("folderName: %s, folderToken: %s", folderName, folderToken), resp.getMsg());
+                throw new FsHelperException("【飞书表格】 创建文件夹失败！");
+            }
+        } catch (Exception e) {
+            FsLogger.warn("【飞书表格】 创建文件夹异常！参数：{}，错误信息：{}", String.format("folderName: %s, folderToken: %s", folderName, folderToken), e.getMessage(), e);
+            throw new FsHelperException("【飞书表格】 创建文件夹异常！");
+        }
+    }
+
+    public static CreateSpreadsheetRespBody createTable(String tableName, String folderToken, FeishuClient client) {
+        try {
+            CreateSpreadsheetReq req = CreateSpreadsheetReq.newBuilder()
+                    .spreadsheet(Spreadsheet.newBuilder()
+                            .title(tableName)
+                            .folderToken(folderToken)
+                            .build())
+                    .build();
+
+            CreateSpreadsheetResp resp = client.sheets().v3().spreadsheet().create(req);
+            if (resp.success()) {
+                FsLogger.info("【飞书表格】 创建表格成功！ {}", gson.toJson(resp));
+                return resp.getData();
+            } else {
+                FsLogger.warn("【飞书表格】 创建表格失败！错误信息：{}", gson.toJson(resp));
+                throw new FsHelperException("【飞书表格】 创建表格异常！");
+            }
+        } catch (Exception e) {
+            FsLogger.warn("【飞书表格】 创建表格异常！参数：{}，错误信息：{}", String.format("tableName:%s, folderToken:%s", tableName, folderToken), e.getMessage(), e);
+            throw new FsHelperException("【飞书表格】 创建表格异常！");
         }
     }
 
