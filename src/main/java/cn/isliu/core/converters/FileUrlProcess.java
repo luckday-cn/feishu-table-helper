@@ -30,13 +30,17 @@ public class FileUrlProcess implements FieldValueProcess<String> {
                 if (jsonElement.isJsonObject()) {
                     JsonObject jsonObject = jsonElement.getAsJsonObject();
                     String url = getUrlByTextFile(jsonObject);
-                    fileUrls.add(url);
+                    if (url != null && !url.isEmpty()) {
+                        fileUrls.add(url);
+                    }
                 }
             }
         } else if (value instanceof JsonObject) {
             JsonObject jsb = (JsonObject) value;
             String url = getUrlByTextFile(jsb);
-            fileUrls.add(url);
+            if (url != null && !url.isEmpty()) {
+                fileUrls.add(url);
+            }
         }
         return String.join(",", fileUrls);
     }
