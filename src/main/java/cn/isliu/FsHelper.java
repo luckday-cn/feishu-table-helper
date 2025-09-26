@@ -5,7 +5,9 @@ import cn.isliu.core.FileData;
 import cn.isliu.core.FsTableData;
 import cn.isliu.core.Sheet;
 import cn.isliu.core.annotation.TableConf;
+import cn.isliu.core.builder.ReadBuilder;
 import cn.isliu.core.builder.SheetBuilder;
+import cn.isliu.core.builder.WriteBuilder;
 import cn.isliu.core.client.FeishuClient;
 import cn.isliu.core.client.FsClient;
 import cn.isliu.core.enums.ErrorCode;
@@ -20,6 +22,8 @@ import com.google.gson.JsonObject;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 /**
@@ -32,10 +36,10 @@ public class FsHelper {
 
     /**
      * 创建飞书表格
-     * 
+     *
      * 根据传入的实体类结构，在指定的电子表格中创建一个新的工作表，
      * 并设置表头、样式、单元格格式和下拉选项等。
-     * 
+     *
      * @param sheetName 工作表名称
      * @param spreadsheetToken 电子表格Token
      * @param clazz 实体类Class对象，用于解析表头和字段属性
@@ -70,8 +74,12 @@ public class FsHelper {
             FsApiUtil.setCellType(sheetId, "@", "A1", column + 200, client, spreadsheetToken);
         }
 
-        // 5 设置表格下拉
-        FsTableUtil.setTableOptions(spreadsheetToken, headers, fieldsMap, sheetId, tableConf.enableDesc());
+        try {
+            // 5 设置表格下拉
+            FsTableUtil.setTableOptions(spreadsheetToken, headers, fieldsMap, sheetId, tableConf.enableDesc());
+        } catch (Exception e) {
+            Logger.getLogger(SheetBuilder.class.getName()).log(Level.SEVERE,"【表格构建器】设置表格下拉异常！sheetId:" + sheetId + ", 错误信息：{}", e.getMessage());
+        }
         return sheetId;
     }
 
@@ -94,9 +102,9 @@ public class FsHelper {
 
     /**
      * 从飞书表格中读取数据
-     * 
+     *
      * 根据指定的工作表ID和电子表格Token，读取表格数据并映射到实体类对象列表中。
-     * 
+     *
      * @param sheetId 工作表ID
      * @param spreadsheetToken 电子表格Token
      * @param clazz 实体类Class对象，用于数据映射
@@ -134,10 +142,26 @@ public class FsHelper {
     }
 
     /**
+     * 创建飞书表格数据读取构建器
+     *
+     * 返回一个数据读取构建器实例，支持链式调用和高级配置选项，
+     * 如忽略唯一字段等功能。
+     *
+     * @param sheetId 工作表ID
+     * @param spreadsheetToken 电子表格Token
+     * @param clazz 实体类Class对象，用于数据映射
+     * @param <T> 实体类泛型
+     * @return ReadBuilder实例，支持链式调用
+     */
+    public static <T> ReadBuilder<T> readBuilder(String sheetId, String spreadsheetToken, Class<T> clazz) {
+        return new ReadBuilder<>(sheetId, spreadsheetToken, clazz);
+    }
+
+    /**
      * 将数据写入飞书表格
-     * 
+     *
      * 将实体类对象列表写入到指定的飞书表格中，支持新增和更新操作。
-     * 
+     *
      * @param sheetId 工作表ID
      * @param spreadsheetToken 电子表格Token
      * @param dataList 实体类对象列表
@@ -243,5 +267,21 @@ public class FsHelper {
         });
 
         return resp;
+    }
+
+    /**
+     * 创建飞书表格数据写入构建器
+     *
+     * 返回一个数据写入构建器实例，支持链式调用和高级配置选项，
+     * 如忽略唯一字段等功能。
+     *
+     * @param sheetId 工作表ID
+     * @param spreadsheetToken 电子表格Token
+     * @param dataList 要写入的数据列表
+     * @param <T> 实体类泛型
+     * @return WriteBuilder实例，支持链式调用
+     */
+    public static <T> WriteBuilder<T> writeBuilder(String sheetId, String spreadsheetToken, List<T> dataList) {
+        return new WriteBuilder<>(sheetId, spreadsheetToken, dataList);
     }
 }

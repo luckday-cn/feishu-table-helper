@@ -1,6 +1,7 @@
 package cn.isliu.core.converters;
 
-public interface OptionsValueProcess<T> {
+public interface OptionsValueProcess<T, R> {
 
-    T process();
+    T process(R r);
+
 }

@@ -30,14 +30,27 @@ public class FsTableUtil {
 
     /**
      * 获取飞书表格数据
-     * 
+     *
      * 从指定的工作表中读取并处理表格数据
-     * 
+     *
      * @param sheet 工作表对象
      * @param spreadsheetToken 电子表格Token
      * @return 飞书表格数据列表
      */
     public static List<FsTableData> getFsTableData(Sheet sheet, String spreadsheetToken, TableConf tableConf) {
+        return getFsTableData(sheet, spreadsheetToken, tableConf, new ArrayList<>());
+    }
+
+    /**
+     * 获取飞书表格数据（支持忽略唯一字段）
+     *
+     * @param sheet 工作表对象
+     * @param spreadsheetToken 电子表格Token
+     * @param tableConf 表格配置
+     * @param ignoreUniqueFields 计算唯一标识时忽略的字段列表
+     * @return 飞书表格数据列表
+     */
+    public static List<FsTableData> getFsTableData(Sheet sheet, String spreadsheetToken, TableConf tableConf, List<String> ignoreUniqueFields) {
 
         // 计算数据范围
         GridProperties gridProperties = sheet.getGridProperties();
@@ -70,7 +83,7 @@ public class FsTableUtil {
         // 获取飞书表格数据
         TableData tableData = processSheetData(sheet, values);
 
-        List<FsTableData> dataList = getFsTableData(tableData);
+        List<FsTableData> dataList = getFsTableData(tableData, ignoreUniqueFields);
         Map<String, String> titleMap = new HashMap<>();
 
         dataList.stream().filter(d -> d.getRow() == (tableConf.titleRow() - 1)).findFirst()
@@ -95,7 +108,7 @@ public class FsTableUtil {
 
     /**
      * 获取飞书表格数据
-     * 
+     *
      * @param tableData 表格数据对象
      * @return 飞书表格数据列表
      */
@@ -105,7 +118,7 @@ public class FsTableUtil {
 
     /**
      * 获取飞书表格数据
-     * 
+     *
      * @param tableData 表格数据对象
      * @param ignoreUniqueFields 忽略的唯一字段列表
      * @return 飞书表格数据列表
@@ -293,7 +306,9 @@ public class FsTableUtil {
         return resultMap;
     }
 
-    public static void setTableOptions(String spreadsheetToken, List<String> headers, Map<String, FieldProperty> fieldsMap, String sheetId, boolean enableDesc) {
+    public static void setTableOptions(String spreadsheetToken, List<String> headers, Map<String, FieldProperty> fieldsMap,
+                                       String sheetId, boolean enableDesc, Map<String, Object> customProperties) {
+
         List<Object> list = Arrays.asList(headers.toArray());
         int line = getMaxLevel(fieldsMap) + (enableDesc ? 2 : 1);
         fieldsMap.forEach((field, fieldProperty) -> {
@@ -316,25 +331,47 @@ public class FsTableUtil {
                     List<String> result;
                     Class<? extends OptionsValueProcess> optionsClass = tableProperty.optionsClass();
                     try {
+                        Map<String, Object> properties = new HashMap<>();
+                        if (customProperties == null) {
+                            properties.put("_field", fieldProperty);
+                        } else {
+                            customProperties.put("_field", fieldProperty);
+                        }
                         OptionsValueProcess optionsValueProcess = optionsClass.getDeclaredConstructor().newInstance();
-                        result = (List<String>) optionsValueProcess.process();
+                        result = (List<String>) optionsValueProcess.process(customProperties == null ? properties : customProperties);
                     } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
                         throw new RuntimeException(e);
                     }
 
-                    FsApiUtil.setOptions(sheetId, FsClient.getInstance().getClient(), spreadsheetToken, tableProperty.type() == TypeEnum.MULTI_SELECT, position + line, position + 200,
-                            result);
+                    if (result != null && !result.isEmpty()) {
+                        FsApiUtil.setOptions(sheetId, FsClient.getInstance().getClient(), spreadsheetToken, tableProperty.type() == TypeEnum.MULTI_SELECT, position + line, position + 200,
+                                result);
+                    }
                 }
             }
         });
     }
 
-    public static CustomValueService.ValueRequest getHeadTemplateBuilder(String sheetId, List<String> headers, 
-                  Map<String, FieldProperty> fieldsMap, TableConf tableConf) {
-        
+    public static void setTableOptions(String spreadsheetToken, List<String> headers, Map<String, FieldProperty> fieldsMap, String sheetId, boolean enableDesc) {
+        setTableOptions(spreadsheetToken, headers, fieldsMap, sheetId, enableDesc, null);
+    }
+
+    public static CustomValueService.ValueRequest getHeadTemplateBuilder(String sheetId, List<String> headers,
+                                                                         Map<String, FieldProperty> fieldsMap, TableConf tableConf) {
+        return getHeadTemplateBuilder(sheetId, headers, fieldsMap, null, tableConf);
+    }
+
+    public static CustomValueService.ValueRequest getHeadTemplateBuilder(String sheetId, List<String> headers,
+                                                                         Map<String, FieldProperty> fieldsMap, List<String> includeFields, TableConf tableConf) {
+        return getHeadTemplateBuilder(sheetId, headers, fieldsMap, includeFields, tableConf, null);
+    }
+
+    public static CustomValueService.ValueRequest getHeadTemplateBuilder(String sheetId, List<String> headers,
+                                                                         Map<String, FieldProperty> fieldsMap, List<String> includeFields, TableConf tableConf, Map<String, String> fieldDescriptions) {
+
         String position = FsTableUtil.getColumnNameByNuNumber(headers.size());
 
-        CustomValueService.ValueRequest.BatchPutValuesBuilder batchPutValuesBuilder 
+        CustomValueService.ValueRequest.BatchPutValuesBuilder batchPutValuesBuilder
                 = CustomValueService.ValueRequest.batchPutValues();
 
         // 获取父级表头
@@ -342,13 +379,18 @@ public class FsTableUtil {
 
         if (maxLevel == 1) {
             // 单层级表头：按order排序的headers
-            List<String> sortedHeaders = getSortedHeaders(fieldsMap);
+            List<String> sortedHeaders;
+            if (includeFields != null && !includeFields.isEmpty()) {
+                sortedHeaders = includeFields.stream().sorted(Comparator.comparingInt(headers::indexOf)).collect(Collectors.toList());
+            } else {
+                sortedHeaders = getSortedHeaders(fieldsMap);
+            }
             int titleRow = tableConf.titleRow();
             if (tableConf.enableDesc()) {
                 int descRow = titleRow + 1;
                 batchPutValuesBuilder.addRange(sheetId + "!A" + titleRow + ":" + position + descRow);
                 batchPutValuesBuilder.addRow(sortedHeaders.toArray());
-                batchPutValuesBuilder.addRow(getDescArray(sortedHeaders, fieldsMap));
+                batchPutValuesBuilder.addRow(getDescArray(sortedHeaders, fieldsMap, fieldDescriptions));
             } else {
                 batchPutValuesBuilder.addRange(sheetId + "!A" + titleRow + ":" + position + titleRow);
                 batchPutValuesBuilder.addRow(sortedHeaders.toArray());
@@ -357,12 +399,12 @@ public class FsTableUtil {
 
             // 多层级表头：构建层级结构并处理合并单元格
             List<List<HeaderCell>> hierarchicalHeaders = buildHierarchicalHeaders(fieldsMap);
-            
+
             // 处理每一行表头
             for (int rowIndex = 0; rowIndex < hierarchicalHeaders.size(); rowIndex++) {
                 List<HeaderCell> headerRow = hierarchicalHeaders.get(rowIndex);
                 List<Object> rowValues = new ArrayList<>();
-                
+
                 // 将HeaderCell转换为字符串值，并处理合并单元格
                 for (HeaderCell cell : headerRow) {
                     rowValues.add(cell.getValue());
@@ -371,18 +413,23 @@ public class FsTableUtil {
                         rowValues.add(""); // 合并单元格的占位符
                     }
                 }
-                
+
                 int actualRow = rowIndex + 1; // 从第1行开始
                 batchPutValuesBuilder.addRange(sheetId + "!A" + actualRow + ":" + position + actualRow);
                 batchPutValuesBuilder.addRow(rowValues.toArray());
             }
-            
+
             // 如果启用了描述，在最后一行添加描述
             if (tableConf.enableDesc()) {
-                List<String> finalHeaders = getSortedHeaders(fieldsMap);
+                List<String> finalHeaders;
+                if (includeFields != null && !includeFields.isEmpty()) {
+                    finalHeaders = includeFields.stream().sorted(Comparator.comparingInt(headers::indexOf)).collect(Collectors.toList());
+                } else {
+                    finalHeaders = getSortedHeaders(fieldsMap);
+                }
                 int descRow = maxLevel + 1;
                 batchPutValuesBuilder.addRange(sheetId + "!A" + descRow + ":" + position + descRow);
-                batchPutValuesBuilder.addRow(getDescArray(finalHeaders, fieldsMap));
+                batchPutValuesBuilder.addRow(getDescArray(finalHeaders, fieldsMap, fieldDescriptions));
             }
         }
 
@@ -391,16 +438,16 @@ public class FsTableUtil {
 
     /**
      * 获取按order排序的表头列表
-     * 
+     *
      * @param fieldsMap 字段属性映射
      * @return 按order排序的表头列表
      */
     private static List<String> getSortedHeaders(Map<String, FieldProperty> fieldsMap) {
         return fieldsMap.entrySet().stream()
-            .filter(entry -> entry.getValue() != null && entry.getValue().getTableProperty() != null)
-            .sorted(Comparator.comparingInt(entry -> entry.getValue().getTableProperty().order()))
-            .map(Map.Entry::getKey)
-            .collect(Collectors.toList());
+                .filter(entry -> entry.getValue() != null && entry.getValue().getTableProperty() != null)
+                .sorted(Comparator.comparingInt(entry -> entry.getValue().getTableProperty().order()))
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toList());
     }
 
     private static int getMaxLevel(Map<String, FieldProperty> fieldsMap) {
@@ -416,12 +463,30 @@ public class FsTableUtil {
     }
 
     private static Object[] getDescArray(List<String> headers, Map<String, FieldProperty> fieldsMap) {
+        return getDescArray(headers, fieldsMap, null);
+    }
+
+    private static Object[] getDescArray(List<String> headers, Map<String, FieldProperty> fieldsMap, Map<String, String> fieldDescriptions) {
         Object[] descArray = new String[headers.size()];
         for (int i = 0; i < headers.size(); i++) {
             String header = headers.get(i);
             FieldProperty fieldProperty = fieldsMap.get(header);
             if (fieldProperty != null && fieldProperty.getTableProperty() != null) {
-                String desc = fieldProperty.getTableProperty().desc();
+                String desc = null;
+
+                // 优先从字段描述映射中获取描述
+                if (fieldDescriptions != null && !fieldDescriptions.isEmpty()) {
+                    // 从字段路径中提取字段名（最后一个.后面的部分）
+                    String fieldPath = fieldProperty.getField();
+                    String fieldName = fieldPath.substring(fieldPath.lastIndexOf(".") + 1);
+                    desc = fieldDescriptions.get(fieldName);
+                }
+
+                // 如果映射中没有找到，则从注解中获取
+                if (desc == null || desc.isEmpty()) {
+                    desc = fieldProperty.getTableProperty().desc();
+                }
+
                 if (desc != null && !desc.isEmpty()) {
                     try {
                         JsonElement element = JsonParser.parseString(desc);
@@ -468,19 +533,19 @@ public class FsTableUtil {
 
     /**
      * 根据层级分组字段属性，并按order排序
-     * 
+     *
      * @param fieldsMap 字段属性映射
      * @return 按层级分组的映射，key为层级，value为该层级的字段名数组（已按order排序）
      */
     public static Map<Integer, List<String>> groupFieldsByLevel(Map<String, FieldProperty> fieldsMap) {
         Map<Integer, List<String>> levelMap = new HashMap<>();
-        
+
         // 按order排序的字段条目
         List<Map.Entry<String, FieldProperty>> sortedEntries = fieldsMap.entrySet().stream()
-            .filter(entry -> entry.getValue() != null && entry.getValue().getTableProperty() != null)
-            .sorted(Comparator.comparingInt(entry -> entry.getValue().getTableProperty().order()))
-            .collect(Collectors.toList());
-        
+                .filter(entry -> entry.getValue() != null && entry.getValue().getTableProperty() != null)
+                .sorted(Comparator.comparingInt(entry -> entry.getValue().getTableProperty().order()))
+                .collect(Collectors.toList());
+
         for (Map.Entry<String, FieldProperty> entry : sortedEntries) {
             FieldProperty fieldProperty = entry.getValue();
             String[] values = fieldProperty.getTableProperty().value();
@@ -488,7 +553,7 @@ public class FsTableUtil {
                 levelMap.computeIfAbsent(i, k -> new ArrayList<>()).add(values[i]);
             }
         }
-        
+
         return levelMap;
     }
 
@@ -497,40 +562,40 @@ public class FsTableUtil {
      * 根据需求实现层级分组和order排序：
      * 1. 按全局order排序，但确保同一分组的字段相邻
      * 2. 同一分组内的字段能够正确合并
-     * 
+     *
      * @param fieldsMap 字段属性映射
      * @return 多层级表头结构，外层为行，内层为列
      */
     public static List<List<HeaderCell>> buildHierarchicalHeaders(Map<String, FieldProperty> fieldsMap) {
         int maxLevel = getMaxLevel(fieldsMap);
         List<List<HeaderCell>> headerRows = new ArrayList<>();
-        
+
         // 初始化每行的表头列表
         for (int i = 0; i < maxLevel; i++) {
             headerRows.add(new ArrayList<>());
         }
-        
+
         // 获取排序后的字段列表，按照特殊规则排序：
         // 1. 相同第一层级的字段必须相邻
         // 2. 在满足条件1的情况下，尽可能按order排序
         List<Map.Entry<String, FieldProperty>> sortedFields = getSortedFieldsWithGrouping(fieldsMap);
-        
+
         // 按排序后的顺序处理每个字段
         for (Map.Entry<String, FieldProperty> entry : sortedFields) {
             String[] values = entry.getValue().getTableProperty().value();
-            
+
             // 统一处理：所有字段都对齐到maxLevel层级
             // 核心思路：最后一个值总是出现在最后一行，前面的值依次向上排列
-            
+
             for (int level = 0; level < maxLevel; level++) {
                 List<HeaderCell> currentRow = headerRows.get(level);
                 HeaderCell headerCell = new HeaderCell();
                 headerCell.setLevel(level);
                 headerCell.setColSpan(1);
-                
+
                 // 计算当前层级应该显示的值
                 String currentValue = "";
-                
+
                 if (values.length == 1) {
                     // 单层级字段：只在最后一行显示
                     if (level == maxLevel - 1) {
@@ -544,15 +609,15 @@ public class FsTableUtil {
                         currentValue = values[valueIndex];
                     }
                 }
-                
+
                 headerCell.setValue(currentValue);
                 currentRow.add(headerCell);
             }
         }
-        
+
         return headerRows;
     }
-    
+
     /**
      * 获取排序后的字段列表，基于最子级字段排序的新规则
      * 核心规则：
@@ -560,44 +625,44 @@ public class FsTableUtil {
      * 2. 相同父级字段形成分组，组内按子级order排序
      * 3. 分组按组内最小order值参与全局排序
      * 4. 三级及以上层级遵循约定大于配置，要求order连续
-     * 
+     *
      * @param fieldsMap 字段属性映射
      * @return 排序后的字段列表
      */
     private static List<Map.Entry<String, FieldProperty>> getSortedFieldsWithGrouping(Map<String, FieldProperty> fieldsMap) {
         int maxLevel = getMaxLevel(fieldsMap);
-        
+
         // 统一的分组排序逻辑，适用于所有层级
         // 按层级路径分组
         Map<String, List<Map.Entry<String, FieldProperty>>> groupedFields = groupFieldsByFirstLevel(fieldsMap);
-        
+
         // 创建分组信息列表
         List<GroupInfo> allGroups = new ArrayList<>();
-        
+
         for (Map.Entry<String, List<Map.Entry<String, FieldProperty>>> groupEntry : groupedFields.entrySet()) {
             List<Map.Entry<String, FieldProperty>> fieldsInGroup = groupEntry.getValue();
-            
+
             // 在组内按order排序（基于最子级字段）
             fieldsInGroup.sort(Comparator.comparingInt(entry -> entry.getValue().getTableProperty().order()));
-            
+
             // 验证组内order连续性（仅对需要合并的分组进行检查，且仅在三级及以上时检查）
             if (maxLevel >= 3 && fieldsInGroup.size() > 1 && !"default".equals(groupEntry.getKey())) {
                 validateOrderContinuity(groupEntry.getKey(), fieldsInGroup);
             }
-            
+
             // 计算组的最小order（用于组间排序）
             int minOrder = fieldsInGroup.stream()
-                .mapToInt(entry -> entry.getValue().getTableProperty().order())
-                .min()
-                .orElse(Integer.MAX_VALUE);
-            
+                    .mapToInt(entry -> entry.getValue().getTableProperty().order())
+                    .min()
+                    .orElse(Integer.MAX_VALUE);
+
             allGroups.add(new GroupInfo(groupEntry.getKey(), minOrder, fieldsInGroup));
         }
-        
+
         // 新的排序逻辑：分组作为整体参与全局order排序
         // 创建排序单元列表（每个单元可能是单个字段或一个分组）
         List<SortUnit> sortUnits = new ArrayList<>();
-        
+
         for (GroupInfo group : allGroups) {
             if ("default".equals(group.getGroupKey())) {
                 // 单层级字段：每个字段都是独立的排序单元
@@ -610,45 +675,45 @@ public class FsTableUtil {
                 sortUnits.add(new SortUnit(group.getMinOrder(), group.getFields(), true));
             }
         }
-        
+
         // 按order排序所有排序单元（实现真正的全局排序）
         sortUnits.sort(Comparator.comparingInt(SortUnit::getOrder));
-        
+
         // 展开为字段列表
         List<Map.Entry<String, FieldProperty>> result = new ArrayList<>();
         for (SortUnit unit : sortUnits) {
             result.addAll(unit.getFields());
         }
-        
+
         return result;
     }
 
     public static List<CustomCellService.CellRequest> getMergeCell(String sheetId, Map<String, FieldProperty> fieldsMap) {
         List<CustomCellService.CellRequest> mergeRequests = new ArrayList<>();
-        
+
         // 构建层级表头结构
         List<List<HeaderCell>> headerRows = buildHierarchicalHeaders(fieldsMap);
-        
+
         // 遍历每一行，查找需要合并的单元格
         for (int rowIndex = 0; rowIndex < headerRows.size(); rowIndex++) {
             List<HeaderCell> headerRow = headerRows.get(rowIndex);
-            
+
             // 查找连续的相同值区域
             int colIndex = 0;
             for (int i = 0; i < headerRow.size(); i++) {
                 HeaderCell currentCell = headerRow.get(i);
                 String currentValue = currentCell.getValue();
-                
+
                 // 跳过空值，空值不需要合并
                 if (currentValue == null || currentValue.trim().isEmpty()) {
                     colIndex++;
                     continue;
                 }
-                
+
                 // 查找相同值的连续区域
                 int startCol = colIndex;
                 int endCol = startCol;
-                
+
                 // 向后查找相同值
                 for (int j = i + 1; j < headerRow.size(); j++) {
                     HeaderCell nextCell = headerRow.get(j);
@@ -659,26 +724,30 @@ public class FsTableUtil {
                         break;
                     }
                 }
-                
+
                 // 如果跨越多列，则需要合并
                 if (endCol > startCol) {
                     String startPosition = getColumnName(startCol) + (rowIndex + 1);
                     String endPosition = getColumnName(endCol) + (rowIndex + 1);
-                    
+
                     CustomCellService.CellRequest mergeRequest = CustomCellService.CellRequest.mergeCells()
                             .sheetId(sheetId)
                             .startPosition(startPosition)
                             .endPosition(endPosition)
                             .build();
-                    
+
                     mergeRequests.add(mergeRequest);
                 }
-                
+
                 colIndex = endCol + 1;
             }
         }
-        
+
         return mergeRequests;
+    }
+
+    public static TableConf getTableConf(Class<?> zClass) {
+        return zClass.getAnnotation(TableConf.class);
     }
 
     /**
@@ -689,24 +758,24 @@ public class FsTableUtil {
         private final int minOrder;
         private final List<Map.Entry<String, FieldProperty>> fields;
         private final int groupDepth;
-        
+
         public GroupInfo(String groupKey, int minOrder, List<Map.Entry<String, FieldProperty>> fields) {
             this(groupKey, minOrder, fields, 1);
         }
-        
+
         public GroupInfo(String groupKey, int minOrder, List<Map.Entry<String, FieldProperty>> fields, int groupDepth) {
             this.groupKey = groupKey;
             this.minOrder = minOrder;
             this.fields = fields;
             this.groupDepth = groupDepth;
         }
-        
+
         public String getGroupKey() { return groupKey; }
         public int getMinOrder() { return minOrder; }
         public List<Map.Entry<String, FieldProperty>> getFields() { return fields; }
         public int getGroupDepth() { return groupDepth; }
     }
-    
+
     /**
      * 排序项类，用于全局排序
      */
@@ -714,18 +783,18 @@ public class FsTableUtil {
         private final int order;
         private final List<Map.Entry<String, FieldProperty>> fields;
         private final boolean isGroup;
-        
+
         public SortItem(int order, List<Map.Entry<String, FieldProperty>> fields, boolean isGroup) {
             this.order = order;
             this.fields = fields;
             this.isGroup = isGroup;
         }
-        
+
         public int getOrder() { return order; }
         public List<Map.Entry<String, FieldProperty>> getFields() { return fields; }
         public boolean isGroup() { return isGroup; }
     }
-    
+
     /**
      * 排序单元类，用于分组整体排序
      * 一个排序单元可以是单个字段或一个完整的分组
@@ -734,36 +803,36 @@ public class FsTableUtil {
         private final int order;
         private final List<Map.Entry<String, FieldProperty>> fields;
         private final boolean isGroup;
-        
+
         public SortUnit(int order, List<Map.Entry<String, FieldProperty>> fields, boolean isGroup) {
             this.order = order;
             this.fields = fields;
             this.isGroup = isGroup;
         }
-        
+
         public int getOrder() { return order; }
         public List<Map.Entry<String, FieldProperty>> getFields() { return fields; }
         public boolean isGroup() { return isGroup; }
     }
-    
+
     /**
      * 按层级路径分组字段
      * 根据需求：
      * 1. 单层级字段（如"部门"）放入"default"分组
      * 2. 多层级字段按完整的层级路径分组（除最后一级）
      * 例如：["ID", "员工信息", "姓名"] → 分组key为 "ID|员工信息"
-     * 
+     *
      * @param fieldsMap 字段属性映射
      * @return 按层级路径分组的字段映射
      */
     private static Map<String, List<Map.Entry<String, FieldProperty>>> groupFieldsByFirstLevel(Map<String, FieldProperty> fieldsMap) {
         Map<String, List<Map.Entry<String, FieldProperty>>> groupedFields = new LinkedHashMap<>();
-        
+
         for (Map.Entry<String, FieldProperty> entry : fieldsMap.entrySet()) {
             FieldProperty fieldProperty = entry.getValue();
             if (fieldProperty != null && fieldProperty.getTableProperty() != null) {
                 String[] values = fieldProperty.getTableProperty().value();
-                
+
                 String groupKey;
                 if (values.length == 1) {
                     // 单层级字段放入默认分组
@@ -777,18 +846,18 @@ public class FsTableUtil {
                     }
                     groupKey = pathBuilder.toString();
                 }
-                
+
                 groupedFields.computeIfAbsent(groupKey, k -> new ArrayList<>()).add(entry);
             }
         }
-        
+
         return groupedFields;
     }
-    
+
     /**
      * 验证组内字段order的连续性
      * 三级及以上层级要求同一分组内的字段order必须连续
-     * 
+     *
      * @param groupKey 分组key
      * @param fieldsInGroup 分组内的字段列表（已按order排序）
      */
@@ -796,24 +865,24 @@ public class FsTableUtil {
         if (fieldsInGroup.size() <= 1) {
             return; // 单个字段无需验证
         }
-        
+
         for (int i = 1; i < fieldsInGroup.size(); i++) {
             int prevOrder = fieldsInGroup.get(i - 1).getValue().getTableProperty().order();
             int currentOrder = fieldsInGroup.get(i).getValue().getTableProperty().order();
-            
+
             if (currentOrder != prevOrder + 1) {
                 String prevFieldName = fieldsInGroup.get(i - 1).getKey();
                 String currentFieldName = fieldsInGroup.get(i).getKey();
-                
+
                 throw new IllegalArgumentException(
-                    String.format("分组 '%s' 中的字段order不连续: %s(order=%d) 和 %s(order=%d). " +
-                                "三级及以上层级要求同一分组内的order必须连续。",
+                        String.format("分组 '%s' 中的字段order不连续: %s(order=%d) 和 %s(order=%d). " +
+                                        "三级及以上层级要求同一分组内的order必须连续。",
                                 groupKey, prevFieldName, prevOrder, currentFieldName, currentOrder)
                 );
             }
         }
     }
-    
+
     /**
      * 表头单元格类，用于支持合并单元格
      */
@@ -822,23 +891,23 @@ public class FsTableUtil {
         private int level;
         private int colSpan = 1;
         private int rowSpan = 1;
-        
+
         public String getValue() { return value; }
         public void setValue(String value) { this.value = value; }
-        
+
         public int getLevel() { return level; }
         public void setLevel(int level) { this.level = level; }
-        
+
         public int getColSpan() { return colSpan; }
         public void setColSpan(int colSpan) { this.colSpan = colSpan; }
-        
+
         public int getRowSpan() { return rowSpan; }
         public void setRowSpan(int rowSpan) { this.rowSpan = rowSpan; }
     }
 
     /**
      * 按指定字符数给文本添加换行符
-     * 
+     *
      * @param text 需要处理的文本
      * @param charsPerLine 每行字符数
      * @return 添加换行符后的文本
@@ -847,7 +916,7 @@ public class FsTableUtil {
         if (text == null || text.isEmpty()) {
             return text;
         }
-        
+
         StringBuilder result = new StringBuilder();
         for (int i = 0; i < text.length(); i += charsPerLine) {
             if (i > 0) {
@@ -861,7 +930,7 @@ public class FsTableUtil {
 
     /**
      * 每8个字符添加一个换行符（默认方法）
-     * 
+     *
      * @param text 需要处理的文本
      * @return 添加换行符后的文本
      */

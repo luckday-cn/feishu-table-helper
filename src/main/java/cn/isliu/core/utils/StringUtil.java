@@ -57,6 +57,28 @@ public class StringUtil {
     }
 
     /**
+     * 驼峰转下划线命名
+     * @param camelCaseName 驼峰命名的字符串
+     * @return 下划线命名的字符串
+     */
+    public static String toUnderscoreCase(String camelCaseName) {
+        if (camelCaseName == null || camelCaseName.isEmpty()) {
+            return camelCaseName;
+        }
+
+        StringBuilder result = new StringBuilder();
+        for (char c : camelCaseName.toCharArray()) {
+            if (Character.isUpperCase(c)) {
+                result.append('_').append(Character.toLowerCase(c));
+            } else {
+                result.append(c);
+            }
+        }
+        return result.toString();
+    }
+
+
+    /**
      * 下划线转驼峰命名
      * @param underscoreName 下划线命名的字符串
      * @return 驼峰命名的字符串
@@ -92,7 +114,7 @@ public class StringUtil {
         if (collection == null || collection.isEmpty()) {
             return "";
         }
-        
+
         StringBuilder sb = new StringBuilder();
         Iterator<?> iterator = collection.iterator();
         while (iterator.hasNext()) {
@@ -114,7 +136,7 @@ public class StringUtil {
         if (array == null || array.length == 0) {
             return "";
         }
-        
+
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < array.length; i++) {
             sb.append(array[i] != null ? array[i].toString() : "");

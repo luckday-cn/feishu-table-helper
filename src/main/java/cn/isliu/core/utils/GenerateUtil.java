@@ -24,10 +24,9 @@ import java.util.stream.Collectors;
 public class GenerateUtil {
 
     // 使用统一的FsLogger替代java.util.logging.Logger
-
     /**
      * 根据配置和数据生成DTO对象（通用版本）
-     * 
+     *
      * @param fieldPathList 字段路径列表
      * @param clazz 实体类Class对象
      * @param dataMap 数据映射Map
@@ -49,7 +48,7 @@ public class GenerateUtil {
                 try {
                     setNestedField(t, fieldPath, value);
                 } catch (Exception e) {
-                    FsLogger.error(ErrorCode.DATA_CONVERSION_ERROR, "【巨量广告助手】 获取字段值异常！参数：" + fieldPath + "，异常：" + e.getMessage(), "generateList", e);
+                    FsLogger.error(ErrorCode.DATA_CONVERSION_ERROR, "【飞书助手】 获取字段值异常！参数：" + fieldPath + "，异常：" + e.getMessage(), "generateList", e);
                 }
             }
         });
@@ -59,7 +58,7 @@ public class GenerateUtil {
 
     /**
      * 递归设置嵌套字段值（支持List类型处理）
-     * 
+     *
      * @param target 目标对象
      * @param fieldPath 字段路径
      * @param value 字段值
@@ -73,7 +72,7 @@ public class GenerateUtil {
 
     /**
      * 递归设置嵌套字段值
-     * 
+     *
      * @param target 目标对象
      * @param parts 字段路径分段数组
      * @param index 当前处理的字段索引
@@ -179,11 +178,15 @@ public class GenerateUtil {
         Class<?> fieldType = field.getType();
 
         // 简单类型转换
-        if (value != null) {
+        if (value != null && value != "") {
             if (fieldType == String.class) {
                 field.set(target, convertStrValue(value));
             } else if (fieldType == Integer.class || fieldType == int.class) {
-                field.set(target, Integer.parseInt(convertValue(value)));
+                String val = convertValue(value);
+                BigDecimal bd = new BigDecimal(val);
+                bd = bd.setScale(0, BigDecimal.ROUND_DOWN);
+                String result = bd.toPlainString();
+                field.set(target, Integer.parseInt(result));
             } else if (fieldType == Double.class || fieldType == double.class) {
                 field.set(target, Double.parseDouble(convertValue(value)));
             } else if (fieldType == Boolean.class || fieldType == boolean.class) {
@@ -253,7 +256,7 @@ public class GenerateUtil {
                 // 继续在父类中查找
             }
         }
-        
+
         // 如果直接查找失败，尝试使用下划线转驼峰的方式查找字段
         String camelCaseFieldName = StringUtil.toCamelCase(fieldName);
         for (Class<?> c = clazz; c != null; c = c.getSuperclass()) {
@@ -263,7 +266,7 @@ public class GenerateUtil {
                 // 继续在父类中查找
             }
         }
-        
+
         return null;
     }
 
@@ -347,7 +350,7 @@ public class GenerateUtil {
         for (Map.Entry<String, String> entry : fieldMap.entrySet()) {
             String fieldName = entry.getKey();
             String fieldPath = entry.getValue();
-            
+
             try {
                 Object value = getNestedFieldValue(target, fieldPath);
                 if (value != null) {
@@ -456,7 +459,7 @@ public class GenerateUtil {
         return fieldValue;
     }
 
-    public static <T> @Nullable String getUniqueId(T data) {
+    public static <T> String getUniqueId(T data) {
         String uniqueId = null;
         try {
             Object uniqueIdObj = GenerateUtil.getNestedFieldValue(data, "uniqueId");

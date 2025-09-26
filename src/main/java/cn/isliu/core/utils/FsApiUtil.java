@@ -38,14 +38,14 @@ public class FsApiUtil {
 
     /**
      * 获取工作表数据
-     * 
+     * <p>
      * 从指定的飞书表格中读取指定范围的数据
-     * 
-     * @param sheetId 工作表ID
+     *
+     * @param sheetId          工作表ID
      * @param spreadsheetToken 电子表格Token
-     * @param startPosition 起始位置（如"A1"）
-     * @param endPosition 结束位置（如"Z100"）
-     * @param client 飞书客户端
+     * @param startPosition    起始位置（如"A1"）
+     * @param endPosition      结束位置（如"Z100"）
+     * @param client           飞书客户端
      * @return 表格数据对象
      */
     public static ValuesBatch getSheetData(String sheetId, String spreadsheetToken, String startPosition, String endPosition, FeishuClient client) {
@@ -78,11 +78,11 @@ public class FsApiUtil {
 
     /**
      * 获取工作表元数据
-     * 
+     * <p>
      * 获取指定工作表的元数据信息，包括行列数、工作表名称等
-     * 
-     * @param sheetId 工作表ID
-     * @param client 飞书客户端
+     *
+     * @param sheetId          工作表ID
+     * @param client           飞书客户端
      * @param spreadsheetToken 电子表格Token
      * @return 工作表对象
      */
@@ -157,7 +157,7 @@ public class FsApiUtil {
 
     /**
      * 获取根目录Token
-     *
+     * <p>
      * 调用飞书开放平台API获取当前租户的根目录token，用于后续的文件夹和文件操作
      * API接口: GET https://open.feishu.cn/open-apis/drive/v1/files/root_folder/meta
      *
@@ -266,7 +266,7 @@ public class FsApiUtil {
             String message = e.getMessage();
             FsLogger.warn("【飞书表格】 创建 sheet 异常！错误信息：{}", message);
 
-            throw new FsHelperException(message != null && message.contains("403")? "请按照上方操作，当前智投无法操作对应文档哦" : "【飞书表格】 创建 sheet 异常！");
+            throw new FsHelperException(message != null && message.contains("403") ? "请按照上方操作，当前智投无法操作对应文档哦" : "【飞书表格】 创建 sheet 异常！");
         }
         return sheetId;
     }
@@ -400,7 +400,7 @@ public class FsApiUtil {
         }
     }
 
-    public static String downloadTmpMaterialUrl(String fileToken,  FeishuClient client) {
+    public static String downloadTmpMaterialUrl(String fileToken, FeishuClient client) {
         String tmpUrl = "";
         try {
             BatchGetTmpDownloadUrlMediaReq req = BatchGetTmpDownloadUrlMediaReq.newBuilder()
@@ -450,8 +450,8 @@ public class FsApiUtil {
         try {
             CustomValueService.ValueBatchUpdateRequest batchPutDataRequest =
                     CustomValueService.ValueBatchUpdateRequest.newBuilder()
-                    .addRequest(batchPutRequest)
-                    .build();
+                            .addRequest(batchPutRequest)
+                            .build();
 
             ApiResponse batchPutResp = client.customValues().valueBatchUpdate(spreadsheetToken, batchPutDataRequest);
             if (batchPutResp.success()) {
@@ -466,7 +466,7 @@ public class FsApiUtil {
         }
     }
 
-    public static Object addRowColumns(String sheetId, String spreadsheetToken, String type, int length,FeishuClient client) {
+    public static Object addRowColumns(String sheetId, String spreadsheetToken, String type, int length, FeishuClient client) {
 
         CustomDimensionService.DimensionBatchUpdateRequest batchRequest = CustomDimensionService.DimensionBatchUpdateRequest.newBuilder()
                 .addRequest(CustomDimensionService.DimensionRequest.addDimension()
@@ -512,7 +512,7 @@ public class FsApiUtil {
     }
 
     /**
-     *  字符串类型： formatter: "@"
+     * 字符串类型： formatter: "@"
      */
     public static void setCellType(String sheetId, String formatter, String startPosition, String endPosition, FeishuClient client, String spreadsheetToken) {
         try {
@@ -533,7 +533,7 @@ public class FsApiUtil {
         }
     }
 
-    public static Object imageUpload(byte[] imageData, String fileName, String position ,String sheetId, String spreadsheetToken, FeishuClient client) {
+    public static Object imageUpload(byte[] imageData, String fileName, String position, String sheetId, String spreadsheetToken, FeishuClient client) {
         try {
 
             CustomValueService.ValueRequest imageRequest = CustomValueService.ValueRequest.imageValues()
@@ -553,7 +553,7 @@ public class FsApiUtil {
             }
             return imageResp.getData();
         } catch (Exception e) {
-            FsLogger.error(ErrorCode.API_SERVER_ERROR,"【飞书表格】 文件上传异常！" + e.getMessage(), fileName, e);
+            FsLogger.error(ErrorCode.API_SERVER_ERROR, "【飞书表格】 文件上传异常！" + e.getMessage(), fileName, e);
         }
 
         return null;

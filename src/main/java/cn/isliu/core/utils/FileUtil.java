@@ -110,13 +110,13 @@ public class FileUtil {
         if (!tempDir.endsWith(File.separator)) {
             tempDir += File.separator;
         }
-        
+
         // 确保目录存在
         File dir = new File(tempDir);
         if (!dir.exists()) {
             dir.mkdirs();
         }
-        
+
         return tempDir;
     }
 
@@ -133,21 +133,24 @@ public class FileUtil {
 
         // 常见的图片文件扩展名
         String[] imageExtensions = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".svg", ".ico"};
-        
+
         // 转换为小写进行比较
         String path = filePath.toLowerCase();
-        
+
         // 检查URL或本地路径是否以图片扩展名结尾
         for (String extension : imageExtensions) {
             if (path.endsWith(extension)) {
                 return true;
             }
         }
-        
+
         return false;
     }
 
     public static String getFileName(String path) {
+        if (path.startsWith("http")) {
+            return path.substring(path.lastIndexOf("/") + 1);
+        }
         return Paths.get(path).getFileName().toString();
     }
 }
