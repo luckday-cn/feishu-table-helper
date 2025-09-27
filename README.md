@@ -22,14 +22,14 @@ feishu-table-helper 是一个简化飞书表格操作的 Java 库。通过使用
 <dependency>
     <groupId>cn.isliu</groupId>
     <artifactId>feishu-table-helper</artifactId>
-    <version>0.0.3</version>
+    <version>0.0.4</version>
 </dependency>
 ```
 
 ### Gradle
 
 ```gradle
-implementation 'cn.isliu:feishu-table-helper:0.0.3'
+implementation 'cn.isliu:feishu-table-helper:0.0.4'
 ```
 
 ## 快速开始
