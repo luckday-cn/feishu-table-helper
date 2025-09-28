@@ -14,6 +14,7 @@ import cn.isliu.core.service.CustomValueService;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonSyntaxException;
+import org.jetbrains.annotations.NotNull;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.*;
@@ -356,18 +357,18 @@ public class FsTableUtil {
         setTableOptions(spreadsheetToken, headers, fieldsMap, sheetId, enableDesc, null);
     }
 
+//    public static CustomValueService.ValueRequest getHeadTemplateBuilder(String sheetId, List<String> headers,
+//                   Map<String, FieldProperty> fieldsMap, TableConf tableConf) {
+//        return getHeadTemplateBuilder(sheetId, headers, fieldsMap, null, tableConf);
+//    }
+
     public static CustomValueService.ValueRequest getHeadTemplateBuilder(String sheetId, List<String> headers,
                                                                          Map<String, FieldProperty> fieldsMap, TableConf tableConf) {
-        return getHeadTemplateBuilder(sheetId, headers, fieldsMap, null, tableConf);
+        return getHeadTemplateBuilder(sheetId, headers, fieldsMap, tableConf, null);
     }
 
     public static CustomValueService.ValueRequest getHeadTemplateBuilder(String sheetId, List<String> headers,
-                                                                         Map<String, FieldProperty> fieldsMap, List<String> includeFields, TableConf tableConf) {
-        return getHeadTemplateBuilder(sheetId, headers, fieldsMap, includeFields, tableConf, null);
-    }
-
-    public static CustomValueService.ValueRequest getHeadTemplateBuilder(String sheetId, List<String> headers,
-                                                                         Map<String, FieldProperty> fieldsMap, List<String> includeFields, TableConf tableConf, Map<String, String> fieldDescriptions) {
+                                                                         Map<String, FieldProperty> fieldsMap, TableConf tableConf, Map<String, String> fieldDescriptions) {
 
         String position = FsTableUtil.getColumnNameByNuNumber(headers.size());
 
@@ -378,22 +379,15 @@ public class FsTableUtil {
         int maxLevel = getMaxLevel(fieldsMap);
 
         if (maxLevel == 1) {
-            // 单层级表头：按order排序的headers
-            List<String> sortedHeaders;
-            if (includeFields != null && !includeFields.isEmpty()) {
-                sortedHeaders = includeFields.stream().sorted(Comparator.comparingInt(headers::indexOf)).collect(Collectors.toList());
-            } else {
-                sortedHeaders = getSortedHeaders(fieldsMap);
-            }
             int titleRow = tableConf.titleRow();
             if (tableConf.enableDesc()) {
                 int descRow = titleRow + 1;
                 batchPutValuesBuilder.addRange(sheetId + "!A" + titleRow + ":" + position + descRow);
-                batchPutValuesBuilder.addRow(sortedHeaders.toArray());
-                batchPutValuesBuilder.addRow(getDescArray(sortedHeaders, fieldsMap, fieldDescriptions));
+                batchPutValuesBuilder.addRow(headers.toArray());
+                batchPutValuesBuilder.addRow(getDescArray(headers, fieldsMap, fieldDescriptions));
             } else {
                 batchPutValuesBuilder.addRange(sheetId + "!A" + titleRow + ":" + position + titleRow);
-                batchPutValuesBuilder.addRow(sortedHeaders.toArray());
+                batchPutValuesBuilder.addRow(headers.toArray());
             }
         } else {
 
@@ -421,19 +415,45 @@ public class FsTableUtil {
 
             // 如果启用了描述，在最后一行添加描述
             if (tableConf.enableDesc()) {
-                List<String> finalHeaders;
-                if (includeFields != null && !includeFields.isEmpty()) {
-                    finalHeaders = includeFields.stream().sorted(Comparator.comparingInt(headers::indexOf)).collect(Collectors.toList());
-                } else {
-                    finalHeaders = getSortedHeaders(fieldsMap);
-                }
                 int descRow = maxLevel + 1;
                 batchPutValuesBuilder.addRange(sheetId + "!A" + descRow + ":" + position + descRow);
-                batchPutValuesBuilder.addRow(getDescArray(finalHeaders, fieldsMap, fieldDescriptions));
+                batchPutValuesBuilder.addRow(getDescArray(headers, fieldsMap, fieldDescriptions));
             }
         }
 
         return batchPutValuesBuilder.build();
+    }
+
+    @NotNull
+    private static List<String> getIncludeFieldHeaders(List<String> headers, Map<String, FieldProperty> fieldsMap, List<String> includeFields) {
+        return includeFields.stream()
+                .map(includeField -> {
+                    // 查找匹配的fieldsMap key
+                    for (Map.Entry<String, FieldProperty> entry : fieldsMap.entrySet()) {
+                        FieldProperty fieldProperty = entry.getValue();
+                        if (fieldProperty != null && fieldProperty.getTableProperty() != null) {
+                            String field = fieldProperty.getField();
+                            if (field != null) {
+                                // 获取最后一个属性并转换为下划线格式
+                                String[] split = field.split("\\.");
+                                String lastValue = split[split.length - 1];
+                                String underscoreFormat = StringUtil.toUnderscoreCase(lastValue);
+                                // 如果匹配，返回fieldsMap的key
+                                if (underscoreFormat.equals(includeField)) {
+                                    return entry.getKey();
+                                }
+
+                                if (lastValue.equals(includeField)) {
+                                    return entry.getKey();
+                                }
+                            }
+                        }
+                    }
+                    // 如果没有匹配到，返回原始值
+                    return includeField;
+                })
+                .sorted(Comparator.comparingInt(includeFields::indexOf))
+                .collect(Collectors.toList());
     }
 
     /**
@@ -480,6 +500,9 @@ public class FsTableUtil {
                     String fieldPath = fieldProperty.getField();
                     String fieldName = fieldPath.substring(fieldPath.lastIndexOf(".") + 1);
                     desc = fieldDescriptions.get(fieldName);
+                    if (desc == null) {
+                        desc = fieldDescriptions.get(StringUtil.toUnderscoreCase(fieldName));
+                    }
                 }
 
                 // 如果映射中没有找到，则从注解中获取

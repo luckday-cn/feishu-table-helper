@@ -26,14 +26,14 @@ public class PropertyUtil {
 
     /**
      * 获取类及其嵌套类上@TableProperty注解的字段映射关系
-     * 
+     *
      * 此方法是入口方法，用于获取一个类及其所有嵌套类中，
      * 被@TableProperty注解标记的字段的映射关系。
      * 注解中的值作为key，FieldProperty对象作为value返回。
      *
      * 对于嵌套属性，使用'.'连接符来表示层级关系。
      * 该方法会过滤掉有子级的字段，只返回最底层的字段映射。
-     * 
+     *
      * @param clazz 要处理的类
      * @return 包含所有@TableProperty注解字段映射关系的Map，嵌套属性使用'.'连接
      */
@@ -59,7 +59,7 @@ public class PropertyUtil {
      * 收集所有被@TableProperty注解标记的字段信息。
      *
      * 方法会处理循环引用问题，并限制递归深度，防止栈溢出。
-     * 
+     *
      * @param clazz 当前处理的类
      * @param result 存储结果的Map
      * @param keyPrefix key的前缀（使用注解中的值构建）
@@ -73,7 +73,7 @@ public class PropertyUtil {
         if (!isTargetPackageClass(clazz)) {
             return;
         }
-        
+
         // 检测循环引用，限制递归深度
         Integer currentDepth = depthMap.getOrDefault(clazz, 0);
         if (currentDepth > 5) { // 限制最大递归深度为5
@@ -129,14 +129,14 @@ public class PropertyUtil {
         if (clazz == null) {
             return false;
         }
-        
+
         String className = clazz.getName();
         // 只处理用户自定义的类，排除系统类
-        return !className.startsWith("java.") && 
-               !className.startsWith("javax.") && 
-               !className.startsWith("sun.") && 
-               !className.startsWith("com.sun.") &&
-               !className.startsWith("jdk.");
+        return !className.startsWith("java.") &&
+                !className.startsWith("javax.") &&
+                !className.startsWith("sun.") &&
+                !className.startsWith("com.sun.") &&
+                !className.startsWith("jdk.");
     }
 
     /**
@@ -276,7 +276,7 @@ public class PropertyUtil {
             // 构建新的前缀
             String newKeyPrefix;
             String newValuePrefix = valuePrefix.isEmpty() ? field.getName() : valuePrefix + "." + field.getName();
-            
+
             // 关键修改：如果父节点没有注解，则不拼接父节点字段名
             if (parentHasAnnotation) {
                 // 父节点有注解，需要拼接
@@ -349,7 +349,7 @@ public class PropertyUtil {
                 clazz.equals(Character.class) ||
                 clazz.equals(Byte.class) ||
                 clazz.equals(Short.class) ||
-                clazz.equals(java.util.Date.class) ||
+                clazz.equals(Date.class) ||
                 clazz.equals(java.time.LocalDate.class) ||
                 clazz.equals(java.time.LocalDateTime.class));
     }
@@ -365,7 +365,70 @@ public class PropertyUtil {
      */
     @NotNull
     public static List<String> getHeaders(Map<String, FieldProperty> fieldsMap) {
+        return getSortedHeaders(fieldsMap);
+    }
+
+    /**
+     * 从字段属性映射中提取表头列表
+     *
+     * 此方法根据字段的@TableProperty注解中的order属性对字段进行排序，
+     * 返回按顺序排列的表头列表，用于数据展示时的列顺序。
+     *
+     * @param fieldsMap 字段属性映射
+     * @return 按顺序排列的表头列表
+     */
+    @NotNull
+    public static List<String> getHeaders(Map<String, FieldProperty> fieldsMap, List<String> includeFields) {
+        List<String> sortedHeaders;
+        if (includeFields != null && !includeFields.isEmpty()) {
+            sortedHeaders = getIncludeFieldHeaders(fieldsMap, includeFields);
+        } else {
+            sortedHeaders = getSortedHeaders(fieldsMap);
+        }
+        return sortedHeaders;
+    }
+
+    @NotNull
+    private static List<String> getIncludeFieldHeaders(Map<String, FieldProperty> fieldsMap, List<String> includeFields) {
+        return includeFields.stream()
+                .map(includeField -> {
+                    // 查找匹配的fieldsMap key
+                    for (Map.Entry<String, FieldProperty> entry : fieldsMap.entrySet()) {
+                        FieldProperty fieldProperty = entry.getValue();
+                        if (fieldProperty != null && fieldProperty.getTableProperty() != null) {
+                            String field = fieldProperty.getField();
+                            if (field != null) {
+                                // 获取最后一个属性并转换为下划线格式
+                                String[] split = field.split("\\.");
+                                String lastValue = split[split.length - 1];
+                                String underscoreFormat = StringUtil.toUnderscoreCase(lastValue);
+                                // 如果匹配，返回fieldsMap的key
+                                if (underscoreFormat.equals(includeField)) {
+                                    return entry.getKey();
+                                }
+
+                                if (lastValue.equals(includeField)) {
+                                    return entry.getKey();
+                                }
+                            }
+                        }
+                    }
+                    // 如果没有匹配到，返回原始值
+                    return includeField;
+                })
+                .sorted(Comparator.comparingInt(includeFields::indexOf))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 获取按order排序的表头列表
+     *
+     * @param fieldsMap 字段属性映射
+     * @return 按order排序的表头列表
+     */
+    private static List<String> getSortedHeaders(Map<String, FieldProperty> fieldsMap) {
         return fieldsMap.entrySet().stream()
+                .filter(entry -> entry.getValue() != null && entry.getValue().getTableProperty() != null)
                 .sorted(Comparator.comparingInt(entry -> entry.getValue().getTableProperty().order()))
                 .map(Map.Entry::getKey)
                 .collect(Collectors.toList());
