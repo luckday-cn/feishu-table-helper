@@ -307,6 +307,34 @@ public class FsTableUtil {
         return resultMap;
     }
 
+    public static void setTableOptions(String spreadsheetToken, String sheetId,  Class<?> clazz) {
+        setTableOptions(spreadsheetToken, sheetId, clazz, null, null);
+    }
+
+    public static void setTableOptions(String spreadsheetToken, String sheetId,  Class<?> clazz,
+                                       Map<String, Object> customProperties, List<String> includeFields) {
+        Map<String, FieldProperty> fieldsMap = PropertyUtil.getTablePropertyFieldsMap(clazz);
+        Map<String, FieldProperty> currFieldsMap;
+        if (includeFields != null && !includeFields.isEmpty()) {
+            currFieldsMap = fieldsMap.entrySet().stream()
+                    .filter(entry -> {
+                        String field = entry.getValue().getField();
+                        field = field.substring(field.lastIndexOf(".") + 1);
+                        if (field.isEmpty()) {
+                            return false;
+                        }
+                        return includeFields.contains(StringUtil.toUnderscoreCase(field));
+                    }).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+        } else {
+            currFieldsMap = fieldsMap;
+        }
+
+        List<String> headers = PropertyUtil.getHeaders(currFieldsMap, includeFields);
+
+        TableConf tableConf = PropertyUtil.getTableConf(clazz);
+        setTableOptions(spreadsheetToken, headers, currFieldsMap, sheetId, tableConf.enableDesc(), customProperties);
+    }
+
     public static void setTableOptions(String spreadsheetToken, List<String> headers, Map<String, FieldProperty> fieldsMap,
                                        String sheetId, boolean enableDesc, Map<String, Object> customProperties) {
 
@@ -356,11 +384,6 @@ public class FsTableUtil {
     public static void setTableOptions(String spreadsheetToken, List<String> headers, Map<String, FieldProperty> fieldsMap, String sheetId, boolean enableDesc) {
         setTableOptions(spreadsheetToken, headers, fieldsMap, sheetId, enableDesc, null);
     }
-
-//    public static CustomValueService.ValueRequest getHeadTemplateBuilder(String sheetId, List<String> headers,
-//                   Map<String, FieldProperty> fieldsMap, TableConf tableConf) {
-//        return getHeadTemplateBuilder(sheetId, headers, fieldsMap, null, tableConf);
-//    }
 
     public static CustomValueService.ValueRequest getHeadTemplateBuilder(String sheetId, List<String> headers,
                                                                          Map<String, FieldProperty> fieldsMap, TableConf tableConf) {
@@ -422,52 +445,6 @@ public class FsTableUtil {
         }
 
         return batchPutValuesBuilder.build();
-    }
-
-    @NotNull
-    private static List<String> getIncludeFieldHeaders(List<String> headers, Map<String, FieldProperty> fieldsMap, List<String> includeFields) {
-        return includeFields.stream()
-                .map(includeField -> {
-                    // 查找匹配的fieldsMap key
-                    for (Map.Entry<String, FieldProperty> entry : fieldsMap.entrySet()) {
-                        FieldProperty fieldProperty = entry.getValue();
-                        if (fieldProperty != null && fieldProperty.getTableProperty() != null) {
-                            String field = fieldProperty.getField();
-                            if (field != null) {
-                                // 获取最后一个属性并转换为下划线格式
-                                String[] split = field.split("\\.");
-                                String lastValue = split[split.length - 1];
-                                String underscoreFormat = StringUtil.toUnderscoreCase(lastValue);
-                                // 如果匹配，返回fieldsMap的key
-                                if (underscoreFormat.equals(includeField)) {
-                                    return entry.getKey();
-                                }
-
-                                if (lastValue.equals(includeField)) {
-                                    return entry.getKey();
-                                }
-                            }
-                        }
-                    }
-                    // 如果没有匹配到，返回原始值
-                    return includeField;
-                })
-                .sorted(Comparator.comparingInt(includeFields::indexOf))
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * 获取按order排序的表头列表
-     *
-     * @param fieldsMap 字段属性映射
-     * @return 按order排序的表头列表
-     */
-    private static List<String> getSortedHeaders(Map<String, FieldProperty> fieldsMap) {
-        return fieldsMap.entrySet().stream()
-                .filter(entry -> entry.getValue() != null && entry.getValue().getTableProperty() != null)
-                .sorted(Comparator.comparingInt(entry -> entry.getValue().getTableProperty().order()))
-                .map(Map.Entry::getKey)
-                .collect(Collectors.toList());
     }
 
     private static int getMaxLevel(Map<String, FieldProperty> fieldsMap) {
