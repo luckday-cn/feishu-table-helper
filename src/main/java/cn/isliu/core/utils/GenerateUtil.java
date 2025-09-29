@@ -4,7 +4,6 @@ import cn.isliu.core.FileData;
 import cn.isliu.core.annotation.TableProperty;
 import cn.isliu.core.enums.BaseEnum;
 import cn.isliu.core.enums.FileType;
-import org.jetbrains.annotations.Nullable;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
@@ -24,6 +23,7 @@ import java.util.stream.Collectors;
 public class GenerateUtil {
 
     // 使用统一的FsLogger替代java.util.logging.Logger
+
     /**
      * 根据配置和数据生成DTO对象（通用版本）
      *
@@ -277,14 +277,18 @@ public class GenerateUtil {
             result = bigDecimal.stripTrailingZeros().toPlainString();
         } else if (value instanceof Double) {
             String stringValue = convertValue(value);
-            try {
-                result = String.valueOf(Long.parseLong(stringValue));
-            } catch (NumberFormatException e) {
+
+            // 判断是否为科学计数法
+            if (isScientificNotation(stringValue)) {
                 try {
                     result = String.valueOf(((Double) Double.parseDouble(stringValue)).longValue());
                 } catch (NumberFormatException ex) {
-                    throw new IllegalArgumentException("无法将值 '" + stringValue + "' 转换为 long 或科学计数法表示的数值", ex);
+                    FsLogger.warn("无法将科学计数法值 '" + stringValue + "' 转换为 long, 直接返回原始值");
+                    result = stringValue;
                 }
+            } else {
+                // 不是科学计数法，直接返回原始字符串值
+                result = stringValue;
             }
         } else {
             result = String.valueOf(value);
@@ -301,6 +305,24 @@ public class GenerateUtil {
             result = String.valueOf(value);
         }
         return result.trim();
+    }
+
+    /**
+     * 判断字符串是否为科学计数法格式
+     * 科学计数法格式：数字 + E/e + 数字，如 1.23E+4, 1.23e-2
+     *
+     * @param value 要判断的字符串
+     * @return 如果是科学计数法返回true，否则返回false
+     */
+    private static boolean isScientificNotation(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return false;
+        }
+
+        String trimmed = value.trim();
+        // 使用正则表达式匹配科学计数法格式
+        // 匹配格式：数字(可选小数点) + E/e + 可选正负号 + 数字
+        return trimmed.matches("^[+-]?\\d+(\\.\\d+)?[eE][+-]?\\d+$");
     }
 
     private static Object convertValue(Object value, Class<?> targetType) throws Exception {
