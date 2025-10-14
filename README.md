@@ -48,7 +48,7 @@ try (FsClient fsClient = FsClient.getInstance()) {
 ### 2. 创建实体类
 
 ```java
-@TableConf(headLine = 3, titleRow = 2, enableDesc = true)
+@TableConf(headLine = 4, titleRow = 3, enableDesc = true)
 public class Employee extends BaseEntity {
 
     @TableProperty(value = {"ID", "员工信息", "员工编号"}, order = 0, desc = "员工编号不超过20个字符")
@@ -113,6 +113,7 @@ employees.forEach(emp -> System.out.println(emp.name + " - " + emp.email));
 
 用于配置表格样式：
 
+- `uniKeys()`: 唯一键索引，用于数据更新
 - `headLine()`: 表头行数
 - `titleLine()`: 标题行数
 - `enableCover()`: 是否开启覆盖写入
