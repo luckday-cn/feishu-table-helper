@@ -9,6 +9,14 @@ import java.lang.annotation.*;
 @Retention(RetentionPolicy.RUNTIME)
 @Inherited
 public @interface TableConf {
+
+    /**
+     * 表格唯一键
+     *
+     * @return 表格唯一键
+     */
+    String[] uniKeys() default {};
+
     /**
      * 表头行数
      *

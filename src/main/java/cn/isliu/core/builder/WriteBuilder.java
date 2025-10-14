@@ -13,10 +13,7 @@ import cn.isliu.core.pojo.FieldProperty;
 import cn.isliu.core.service.CustomValueService;
 import cn.isliu.core.utils.*;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
@@ -27,17 +24,18 @@ import java.util.stream.Collectors;
  * 提供链式调用方式写入飞书表格数据，支持忽略唯一字段等高级功能。
  */
 public class WriteBuilder<T> {
-    
+
     private final String sheetId;
     private final String spreadsheetToken;
     private final List<T> dataList;
     private List<String> ignoreUniqueFields;
     private Class<?> clazz;
     private boolean ignoreNotFound;
-    
+    private String groupField;
+
     /**
      * 构造函数
-     * 
+     *
      * @param sheetId 工作表ID
      * @param spreadsheetToken 电子表格Token
      * @param dataList 要写入的数据列表
@@ -48,14 +46,15 @@ public class WriteBuilder<T> {
         this.dataList = dataList;
         this.clazz = null;
         this.ignoreNotFound = false;
+        this.groupField = null;
     }
-    
+
     /**
      * 设置计算唯一标识时忽略的字段列表
-     * 
+     *
      * 指定在计算数据行唯一标识时要忽略的字段名称列表。
      * 这些字段的值变化不会影响数据行的唯一性判断。
-     * 
+     *
      * @param fields 要忽略的字段名称列表
      * @return WriteBuilder实例，支持链式调用
      */
@@ -66,10 +65,10 @@ public class WriteBuilder<T> {
 
     /**
      * 设置用于解析注解的实体类
-     * 
+     *
      * 指定用于解析@TableProperty注解的实体类。这个类可以与数据列表的类型不同，
      * 主要用于获取字段映射关系和表格配置信息。
-     * 
+     *
      * @param clazz 用于解析注解的实体类
      * @return WriteBuilder实例，支持链式调用
      */
@@ -92,12 +91,26 @@ public class WriteBuilder<T> {
         this.ignoreNotFound = ignoreNotFound;
         return this;
     }
-    
+
+    /**
+     * 设置分组字段
+     *
+     * 配置分组字段，用于处理数据行分组。
+     * 当数据行存在分组字段时，将按照分组字段进行分组，并分别处理每个分组。
+     *
+     * @param groupField 分组字段名称
+     * @return WriteBuilder实例，支持链式调用
+     */
+    public WriteBuilder<T> groupField(String groupField) {
+        this.groupField = groupField;
+        return this;
+    }
+
     /**
      * 执行数据写入并返回操作结果
-     * 
+     *
      * 根据配置的参数将数据写入到飞书表格中，支持新增和更新操作。
-     * 
+     *
      * @return 写入操作结果
      */
     public Object build() {
@@ -107,45 +120,64 @@ public class WriteBuilder<T> {
 
         Class<?> aClass = clazz;
         Map<String, FieldProperty> fieldsMap;
-        TableConf tableConf = PropertyUtil.getTableConf(aClass);
 
         Map<String, String> fieldMap = new HashMap<>();
         Class<?> sourceClass = dataList.get(0).getClass();
-        if (aClass.equals(sourceClass)) {
+        if (aClass != null && aClass.equals(sourceClass)) {
             fieldsMap = PropertyUtil.getTablePropertyFieldsMap(aClass);
         } else {
             fieldsMap = PropertyUtil.getTablePropertyFieldsMap(sourceClass);
         }
 
-        fieldsMap.forEach((field, fieldProperty) -> fieldMap.put(field, fieldProperty.getField()));
+        FeishuClient client = FsClient.getInstance().getClient();
+        Sheet sheet = FsApiUtil.getSheetMetadata(sheetId, client, spreadsheetToken);
+
+        TableConf tableConf = aClass != null ? PropertyUtil.getTableConf(aClass) : PropertyUtil.getTableConf(sourceClass);
+        Map<String, String> titlePostionMap = FsTableUtil.getTitlePostionMap(sheet, spreadsheetToken, tableConf);
+        Set<String> keys = titlePostionMap.keySet();
+
+        fieldsMap.forEach((field, fieldProperty) -> {
+            if (keys.contains(field)) {
+                fieldMap.put(field, fieldProperty.getField());
+            }
+        });
 
         // 处理忽略字段名称映射
         List<String> processedIgnoreFields = processIgnoreFields(fieldsMap);
 
-        FeishuClient client = FsClient.getInstance().getClient();
-        Sheet sheet = FsApiUtil.getSheetMetadata(sheetId, client, spreadsheetToken);
-        
         // 使用支持忽略字段的方法获取表格数据
-        List<FsTableData> fsTableDataList = FsTableUtil.getFsTableData(sheet, spreadsheetToken, tableConf, processedIgnoreFields);
-        Map<String, Integer> currTableRowMap = fsTableDataList.stream().collect(Collectors.toMap(FsTableData::getUniqueId, FsTableData::getRow));
+        List<FsTableData> fsTableDataList;
+        if (groupField == null) {
+            fsTableDataList = FsTableUtil.getFsTableData(sheet, spreadsheetToken, tableConf, processedIgnoreFields, fieldsMap);
+        } else {
+            Map<String, List<FsTableData>> groupFsTableData = FsTableUtil.getGroupFsTableData(sheet, spreadsheetToken, tableConf, processedIgnoreFields, fieldsMap);
+            fsTableDataList = groupFsTableData.get(groupField);
+        }
 
-        final Integer[] row = {0};
+        if (!fsTableDataList.isEmpty()) {
+            Map<String, String> fieldsPositionMap = fsTableDataList.get(0).getFieldsPositionMap();
+            if (fieldsPositionMap != null) {
+                titlePostionMap = fieldsPositionMap;
+            }
+        }
+
+        Map<String, Integer> currTableRowMap = fsTableDataList.stream()
+                .filter(fsTableData -> fsTableData.getRow() >= tableConf.headLine())
+                .collect(Collectors.toMap(FsTableData::getUniqueId, FsTableData::getRow));
+
+        final Integer[] row = {tableConf.headLine()};
         fsTableDataList.forEach(fsTableData -> {
-            if (fsTableData.getRow() > row[0]) {
-                row[0] = fsTableData.getRow();
+            if ((fsTableData.getRow() + 1) > row[0]) {
+                row[0] = fsTableData.getRow() + 1;
             }
         });
-
-        Map<String, String> titlePostionMap = FsTableUtil.getTitlePostionMap(sheet, spreadsheetToken, tableConf);
-
-
 
         // 初始化批量插入对象
         CustomValueService.ValueRequest.BatchPutValuesBuilder resultValuesBuilder = CustomValueService.ValueRequest.batchPutValues();
 
         List<FileData> fileDataList = new ArrayList<>();
 
-        AtomicInteger rowCount = new AtomicInteger(row[0] + 1);
+        AtomicInteger rowCount = new AtomicInteger(row[0]);
 
         for (T data : dataList) {
             Map<String, Object> values = GenerateUtil.getFieldValue(data, fieldMap);
@@ -154,20 +186,17 @@ public class WriteBuilder<T> {
             String uniqueId;
             if (data.getClass().equals(aClass)) {
                 // 类型相同，使用忽略字段逻辑计算唯一标识
-                uniqueId = calculateUniqueIdWithIgnoreFields(data, processedIgnoreFields, aClass);
+                uniqueId = calculateUniqueIdWithIgnoreFields(data, processedIgnoreFields, tableConf);
             } else {
-                uniqueId = GenerateUtil.getUniqueId(data);
+                uniqueId = GenerateUtil.getUniqueId(data, tableConf);
             }
 
             AtomicReference<Integer> rowNum = new AtomicReference<>(currTableRowMap.get(uniqueId));
             if (uniqueId != null && rowNum.get() != null) {
                 rowNum.set(rowNum.get() + 1);
+                Map<String, String> finalTitlePostionMap = titlePostionMap;
                 values.forEach((field, fieldValue) -> {
-                    if (!tableConf.enableCover() && fieldValue == null) {
-                        return;
-                    }
-
-                    String position = titlePostionMap.get(field);
+                    String position = finalTitlePostionMap.get(field);
 
                     if (fieldValue instanceof FileData) {
                         FileData fileData = (FileData) fieldValue;
@@ -179,17 +208,17 @@ public class WriteBuilder<T> {
                             fileDataList.add(fileData);
                         }
                     }
-                    resultValuesBuilder.addRange(sheetId, position + rowNum.get(), position + rowNum.get())
-                            .addRow(GenerateUtil.getRowData(fieldValue));
+                    if (tableConf.enableCover() || fieldValue != null) {
+                        resultValuesBuilder.addRange(sheetId, position + rowNum.get(), position + rowNum.get())
+                                .addRow(GenerateUtil.getRowData(fieldValue));
+                    }
                 });
             } else if (!ignoreNotFound) {
                 int rowCou = rowCount.incrementAndGet();
+                Map<String, String> finalTitlePostionMap1 = titlePostionMap;
                 values.forEach((field, fieldValue) -> {
-                    if (!tableConf.enableCover() && fieldValue == null) {
-                        return;
-                    }
 
-                    String position = titlePostionMap.get(field);
+                    String position = finalTitlePostionMap1.get(field);
                     if (fieldValue instanceof FileData) {
                         FileData fileData = (FileData) fieldValue;
                         fileData.setSheetId(sheetId);
@@ -197,15 +226,18 @@ public class WriteBuilder<T> {
                         fileData.setPosition(position + rowCou);
                         fileDataList.add(fileData);
                     }
-                    resultValuesBuilder.addRange(sheetId, position + rowCou, position + rowCou)
-                            .addRow(GenerateUtil.getRowData(fieldValue));
+
+                    if (tableConf.enableCover() || fieldValue != null) {
+                        resultValuesBuilder.addRange(sheetId, position + rowCou, position + rowCou)
+                                .addRow(GenerateUtil.getRowData(fieldValue));
+                    }
                 });
             }
         }
 
         int rowTotal = sheet.getGridProperties().getRowCount();
         int rowNum = rowCount.get();
-        if (rowNum > rowTotal) {
+        if (rowNum >= rowTotal) {
             FsApiUtil.addRowColumns(sheetId, spreadsheetToken, "ROWS", rowTotal - rowNum, client);
         }
 
@@ -225,12 +257,12 @@ public class WriteBuilder<T> {
         }
         return null;
     }
-    
+
     /**
      * 处理忽略字段名称映射
-     * 
+     *
      * 将实体字段名称映射为表格列名称
-     * 
+     *
      * @param fieldsMap 字段映射
      * @return 处理后的忽略字段列表
      */
@@ -238,56 +270,56 @@ public class WriteBuilder<T> {
         if (ignoreUniqueFields == null || ignoreUniqueFields.isEmpty()) {
             return new ArrayList<>();
         }
-        
+
         List<String> processedFields = new ArrayList<>();
-        
+
         // 遍历字段映射，找到对应的表格列名
         for (Map.Entry<String, FieldProperty> entry : fieldsMap.entrySet()) {
             String fieldName = entry.getValue().getField();
             // 获取字段的最后一部分名称（去掉嵌套路径）
             String simpleFieldName = fieldName.substring(fieldName.lastIndexOf(".") + 1);
-            
+
             // 如果忽略字段列表中包含此字段名，则添加对应的表格列名
             if (ignoreUniqueFields.contains(simpleFieldName)) {
                 String tableColumnName = entry.getKey(); // 表格列名（注解中的value值）
                 processedFields.add(tableColumnName);
             }
         }
-        
+
         return processedFields;
     }
-    
+
     /**
      * 计算考虑忽略字段的唯一标识
-     * 
+     *
      * 根据忽略字段列表计算数据的唯一标识
-     * 
+     *
      * @param data 数据对象
      * @param processedIgnoreFields 处理后的忽略字段列表
-     * @param clazz 用于解析注解的实体类
+     * @param tableConf 用于解析注解的表格配置
      * @return 唯一标识
      */
-    private String calculateUniqueIdWithIgnoreFields(T data, List<String> processedIgnoreFields, Class<?> clazz) {
+    private String calculateUniqueIdWithIgnoreFields(T data, List<String> processedIgnoreFields, TableConf tableConf) {
         try {
             // 获取所有字段值
             Map<String, Object> allFieldValues = GenerateUtil.getFieldValue(data, new HashMap<>());
-            
+
             // 如果不需要忽略字段，使用原有逻辑
-            if (processedIgnoreFields.isEmpty()) {
-                return GenerateUtil.getUniqueId(data);
+            if (tableConf.uniKeys().length > 0 || processedIgnoreFields.isEmpty()) {
+                return GenerateUtil.getUniqueId(data, tableConf);
             }
-            
+
             // 移除忽略字段后计算唯一标识
             Map<String, Object> filteredValues = new HashMap<>(allFieldValues);
             processedIgnoreFields.forEach(filteredValues::remove);
-            
+
             // 将过滤后的值转换为JSON字符串并计算SHA256
             String jsonStr = StringUtil.mapToJson(filteredValues);
             return StringUtil.getSHA256(jsonStr);
-            
+
         } catch (Exception e) {
             // 如果计算失败，回退到原有逻辑
-            return GenerateUtil.getUniqueId(data);
+            return GenerateUtil.getUniqueId(data, tableConf);
         }
     }
 }

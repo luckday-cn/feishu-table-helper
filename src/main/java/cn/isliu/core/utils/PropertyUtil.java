@@ -440,9 +440,15 @@ public class PropertyUtil {
             tableConf = clazz.getAnnotation(TableConf.class);
         } else {
             tableConf = new TableConf() {
+
                 @Override
                 public Class<? extends Annotation> annotationType() {
                     return TableConf.class;
+                }
+
+                @Override
+                public String[] uniKeys() {
+                    return new String[0];
                 }
 
                 @Override

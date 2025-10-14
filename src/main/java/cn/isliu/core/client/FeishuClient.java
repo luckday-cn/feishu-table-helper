@@ -23,8 +23,14 @@ public class FeishuClient {
     private final String appId;
     private final String appSecret;
 
-    // 服务管理器，用于统一管理自定义服务实例
-    private final ServiceManager<FeishuClient> serviceManager = new ServiceManager<>(this);
+    // 自定义服务，处理官方SDK未覆盖的API
+    private volatile CustomSheetService customSheetService;
+    private volatile CustomDimensionService customDimensionService;
+    private volatile CustomCellService customCellService;
+    private volatile CustomValueService customValueService;
+    private volatile CustomDataValidationService customDataValidationService;
+    private volatile CustomProtectedDimensionService customProtectedDimensionService;
+    private volatile CustomFileService customFileService;
 
     private FeishuClient(String appId, String appSecret, Client officialClient, OkHttpClient httpClient) {
         this.appId = appId;
@@ -36,7 +42,7 @@ public class FeishuClient {
     /**
      * 创建客户端构建器
      *
-     * @param appId     应用ID
+     * @param appId 应用ID
      * @param appSecret 应用密钥
      * @return 构建器
      */
@@ -68,7 +74,14 @@ public class FeishuClient {
      * @return 扩展表格服务
      */
     public CustomSheetService customSheets() {
-        return serviceManager.getService(CustomSheetService.class, () -> new CustomSheetService(this));
+        if (customSheetService == null) {
+            synchronized (this) {
+                if (customSheetService == null) {
+                    customSheetService = new CustomSheetService(this);
+                }
+            }
+        }
+        return customSheetService;
     }
 
     /**
@@ -77,7 +90,14 @@ public class FeishuClient {
      * @return 扩展行列服务
      */
     public CustomDimensionService customDimensions() {
-        return serviceManager.getService(CustomDimensionService.class, () -> new CustomDimensionService(this));
+        if (customDimensionService == null) {
+            synchronized (this) {
+                if (customDimensionService == null) {
+                    customDimensionService = new CustomDimensionService(this);
+                }
+            }
+        }
+        return customDimensionService;
     }
 
     /**
@@ -86,7 +106,14 @@ public class FeishuClient {
      * @return 扩展单元格服务
      */
     public CustomCellService customCells() {
-        return serviceManager.getService(CustomCellService.class, () -> new CustomCellService(this));
+        if (customCellService == null) {
+            synchronized (this) {
+                if (customCellService == null) {
+                    customCellService = new CustomCellService(this);
+                }
+            }
+        }
+        return customCellService;
     }
 
     /**
@@ -95,7 +122,14 @@ public class FeishuClient {
      * @return 扩展数据值服务
      */
     public CustomValueService customValues() {
-        return serviceManager.getService(CustomValueService.class, () -> new CustomValueService(this));
+        if (customValueService == null) {
+            synchronized (this) {
+                if (customValueService == null) {
+                    customValueService = new CustomValueService(this);
+                }
+            }
+        }
+        return customValueService;
     }
 
     /**
@@ -104,7 +138,14 @@ public class FeishuClient {
      * @return 自定义数据验证服务
      */
     public CustomDataValidationService customDataValidations() {
-        return serviceManager.getService(CustomDataValidationService.class, () -> new CustomDataValidationService(this));
+        if (customDataValidationService == null) {
+            synchronized (this) {
+                if (customDataValidationService == null) {
+                    customDataValidationService = new CustomDataValidationService(this);
+                }
+            }
+        }
+        return customDataValidationService;
     }
 
     /**
@@ -113,7 +154,14 @@ public class FeishuClient {
      * @return 扩展保护范围服务
      */
     public CustomProtectedDimensionService customProtectedDimensions() {
-        return serviceManager.getService(CustomProtectedDimensionService.class, () -> new CustomProtectedDimensionService(this));
+        if (customProtectedDimensionService == null) {
+            synchronized (this) {
+                if (customProtectedDimensionService == null) {
+                    customProtectedDimensionService = new CustomProtectedDimensionService(this);
+                }
+            }
+        }
+        return customProtectedDimensionService;
     }
 
     /**
@@ -122,9 +170,15 @@ public class FeishuClient {
      * @return 扩展文件服务
      */
     public CustomFileService customFiles() {
-        return serviceManager.getService(CustomFileService.class, () -> new CustomFileService(this));
+        if (customFileService == null) {
+            synchronized (this) {
+                if (customFileService == null) {
+                    customFileService = new CustomFileService(this);
+                }
+            }
+        }
+        return customFileService;
     }
-
 
     /**
      * 获取官方客户端
@@ -178,7 +232,7 @@ public class FeishuClient {
             // 默认OkHttp配置
             this.httpClientBuilder =
                     new OkHttpClient.Builder().connectTimeout(10, TimeUnit.MINUTES).readTimeout(10, TimeUnit.MINUTES)
-                            .writeTimeout(10, TimeUnit.MINUTES).connectionPool(new ConnectionPool(5, 5, TimeUnit.MINUTES));
+                            .writeTimeout(10, TimeUnit.MINUTES).callTimeout(30, TimeUnit.MINUTES);
         }
 
         /**

@@ -1,6 +1,7 @@
 package cn.isliu.core.utils;
 
 import cn.isliu.core.FileData;
+import cn.isliu.core.annotation.TableConf;
 import cn.isliu.core.annotation.TableProperty;
 import cn.isliu.core.enums.BaseEnum;
 import cn.isliu.core.enums.FileType;
@@ -21,8 +22,6 @@ import java.util.stream.Collectors;
  * 支持嵌套对象和集合类型的处理
  */
 public class GenerateUtil {
-
-    // 使用统一的FsLogger替代java.util.logging.Logger
 
     /**
      * 根据配置和数据生成DTO对象（通用版本）
@@ -375,7 +374,7 @@ public class GenerateUtil {
 
             try {
                 Object value = getNestedFieldValue(target, fieldPath);
-                if (value != null) {
+                if (fieldPath.split("\\.").length == 1) {
                     result.put(fieldName, value);
                 }
             } catch (Exception e) {
@@ -481,12 +480,26 @@ public class GenerateUtil {
         return fieldValue;
     }
 
-    public static <T> String getUniqueId(T data) {
+    public static <T> String getUniqueId(T data, TableConf tableConf) {
         String uniqueId = null;
         try {
             Object uniqueIdObj = GenerateUtil.getNestedFieldValue(data, "uniqueId");
             if (uniqueIdObj != null) {
                 uniqueId = uniqueIdObj.toString();
+            }
+            if (uniqueId == null && tableConf.uniKeys().length > 0) {
+                String[] uniKeys = tableConf.uniKeys();
+                List<Object> uniKeyValues = new ArrayList<>();
+                for (String uniKey : uniKeys) {
+                    Object value = GenerateUtil.getNestedFieldValue(data, uniKey);
+                    if (value != null) {
+                        uniKeyValues.add(value);
+                    }
+                }
+                if (!uniKeyValues.isEmpty()) {
+                    String jsonStr = StringUtil.listToJson(uniKeyValues);
+                    uniqueId = StringUtil.getSHA256(jsonStr);
+                }
             }
         } catch (Exception e) {
             throw new RuntimeException(e);

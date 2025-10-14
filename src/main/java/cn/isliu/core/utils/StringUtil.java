@@ -147,4 +147,24 @@ public class StringUtil {
         return sb.toString();
     }
 
+    public static String listToJson(List<Object> uniKeyValues) {
+        StringBuilder jsonBuilder = new StringBuilder();
+        jsonBuilder.append("[");
+        for (int i = 0; i < uniKeyValues.size(); i++) {
+            Object value = uniKeyValues.get(i);
+            if (value instanceof String) {
+                jsonBuilder.append("\"").append(value).append("\"");
+            } else if (value == null) {
+                jsonBuilder.append("null");
+            } else {
+                jsonBuilder.append(value);
+            }
+            if (i < uniKeyValues.size() - 1) {
+                jsonBuilder.append(",");
+            }
+        }
+        jsonBuilder.append("]");
+        return jsonBuilder.toString();
+    }
+
 }

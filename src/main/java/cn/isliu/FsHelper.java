@@ -118,7 +118,7 @@ public class FsHelper {
         TableConf tableConf = PropertyUtil.getTableConf(clazz);
 
         Map<String, FieldProperty> fieldsMap = PropertyUtil.getTablePropertyFieldsMap(clazz);
-        List<FsTableData> fsTableDataList = FsTableUtil.getFsTableData(sheet, spreadsheetToken, tableConf);
+        List<FsTableData> fsTableDataList = FsTableUtil.getFsTableData(sheet, spreadsheetToken, tableConf, fieldsMap);
 
         List<String> fieldPathList = fieldsMap.values().stream().map(FieldProperty::getField).collect(Collectors.toList());
 
@@ -179,10 +179,10 @@ public class FsHelper {
 
         FeishuClient client = FsClient.getInstance().getClient();
         Sheet sheet = FsApiUtil.getSheetMetadata(sheetId, client, spreadsheetToken);
-        List<FsTableData> fsTableDataList = FsTableUtil.getFsTableData(sheet, spreadsheetToken, tableConf);
+        List<FsTableData> fsTableDataList = FsTableUtil.getFsTableData(sheet, spreadsheetToken, tableConf, fieldsMap);
         Map<String, Integer> currTableRowMap = fsTableDataList.stream().collect(Collectors.toMap(FsTableData::getUniqueId, FsTableData::getRow));
 
-        final Integer[] row = {0};
+        final Integer[] row = {tableConf.headLine()};
         fsTableDataList.forEach(fsTableData -> {
             if (fsTableData.getRow() > row[0]) {
                 row[0] = fsTableData.getRow();
@@ -190,32 +190,32 @@ public class FsHelper {
         });
 
         Map<String, String> titlePostionMap = FsTableUtil.getTitlePostionMap(sheet, spreadsheetToken, tableConf);
+        Set<String> keys = titlePostionMap.keySet();
 
         Map<String, String> fieldMap = new HashMap<>();
-        fieldsMap.forEach((field, fieldProperty) -> fieldMap.put(field, fieldProperty.getField()));
+        fieldsMap.forEach((field, fieldProperty) -> {
+            if (keys.contains(field)) {
+                fieldMap.put(field, fieldProperty.getField());
+            }
+        });
 
         // 初始化批量插入对象
         CustomValueService.ValueRequest.BatchPutValuesBuilder resultValuesBuilder = CustomValueService.ValueRequest.batchPutValues();
 
         List<FileData> fileDataList = new ArrayList<>();
 
-        AtomicInteger rowCount = new AtomicInteger(row[0] + 1);
+        AtomicInteger rowCount = new AtomicInteger(row[0]);
 
         for (T data : dataList) {
             Map<String, Object> values = GenerateUtil.getFieldValue(data, fieldMap);
 
-            String uniqueId =  GenerateUtil.getUniqueId(data);
+            String uniqueId =  GenerateUtil.getUniqueId(data, tableConf);
 
             AtomicReference<Integer> rowNum = new AtomicReference<>(currTableRowMap.get(uniqueId));
             if (uniqueId != null && rowNum.get() != null) {
                 rowNum.set(rowNum.get() + 1);
                 values.forEach((field, fieldValue) -> {
-                    if (!tableConf.enableCover() && fieldValue == null) {
-                        return;
-                    }
-
                     String position = titlePostionMap.get(field);
-
                     if (fieldValue instanceof FileData) {
                         FileData fileData = (FileData) fieldValue;
                         String fileType = fileData.getFileType();
@@ -226,16 +226,15 @@ public class FsHelper {
                             fileDataList.add(fileData);
                         }
                     }
-                    resultValuesBuilder.addRange(sheetId, position + rowNum.get(), position + rowNum.get())
-                            .addRow(GenerateUtil.getRowData(fieldValue));
+
+                    if (tableConf.enableCover() || fieldValue != null) {
+                        resultValuesBuilder.addRange(sheetId, position + rowNum.get(), position + rowNum.get())
+                                .addRow(GenerateUtil.getRowData(fieldValue));
+                    }
                 });
             } else {
                 int rowCou = rowCount.incrementAndGet();
                 values.forEach((field, fieldValue) -> {
-                    if (!tableConf.enableCover() && fieldValue == null) {
-                        return;
-                    }
-
                     String position = titlePostionMap.get(field);
                     if (fieldValue instanceof FileData) {
                         FileData fileData = (FileData) fieldValue;
@@ -244,15 +243,18 @@ public class FsHelper {
                         fileData.setPosition(position + rowCou);
                         fileDataList.add(fileData);
                     }
-                    resultValuesBuilder.addRange(sheetId, position + rowCou, position + rowCou)
-                            .addRow(GenerateUtil.getRowData(fieldValue));
+
+                    if (tableConf.enableCover() || fieldValue != null) {
+                        resultValuesBuilder.addRange(sheetId, position + rowCou, position + rowCou)
+                                .addRow(GenerateUtil.getRowData(fieldValue));
+                    }
                 });
             }
         }
 
         int rowTotal = sheet.getGridProperties().getRowCount();
         int rowNum = rowCount.get();
-        if (rowNum > rowTotal) {
+        if (rowNum >= rowTotal) {
             FsApiUtil.addRowColumns(sheetId, spreadsheetToken, "ROWS", rowTotal - rowNum, client);
         }
 

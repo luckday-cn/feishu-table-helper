@@ -1,5 +1,8 @@
 package cn.isliu.core.client;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 /**
  * 线程安全的飞书客户端管理器
  * 使用ThreadLocal为每个线程维护独立的客户端实例
@@ -8,6 +11,7 @@ public class FsClient implements AutoCloseable {
 
     private static volatile FsClient instance;
     private final ThreadLocal<FeishuClient> clientHolder = new ThreadLocal<>();
+    private final Map<String, FeishuClient> clientMap = new ConcurrentHashMap<>();
 
     // 私有构造函数防止外部实例化
     private FsClient() {
@@ -55,10 +59,16 @@ public class FsClient implements AutoCloseable {
         if (appSecret == null || appSecret.trim().isEmpty()) {
             throw new IllegalArgumentException("appSecret cannot be null or empty");
         }
-
-        FeishuClient client = FeishuClient.newBuilder(appId, appSecret).build();
-        clientHolder.set(client);
-        return client;
+        if (clientMap.containsKey(appId + "_" + appSecret)) {
+            FeishuClient feishuClient = clientMap.get(appId + "_" + appSecret);
+            clientHolder.set(feishuClient);
+            return feishuClient;
+        } else {
+            FeishuClient client = FeishuClient.newBuilder(appId, appSecret).build();
+            clientMap.put(appId + "_" + appSecret, client);
+            clientHolder.set(client);
+            return client;
+        }
     }
 
     /**

@@ -28,7 +28,6 @@ import java.util.stream.Collectors;
  * 包括数据处理、样式设置、选项设置等功能
  */
 public class FsTableUtil {
-
     /**
      * 获取飞书表格数据
      *
@@ -38,8 +37,8 @@ public class FsTableUtil {
      * @param spreadsheetToken 电子表格Token
      * @return 飞书表格数据列表
      */
-    public static List<FsTableData> getFsTableData(Sheet sheet, String spreadsheetToken, TableConf tableConf) {
-        return getFsTableData(sheet, spreadsheetToken, tableConf, new ArrayList<>());
+    public static List<FsTableData> getFsTableData(Sheet sheet, String spreadsheetToken, TableConf tableConf, Map<String, FieldProperty> fieldsMap) {
+        return getFsTableData(sheet, spreadsheetToken, tableConf, new ArrayList<>(), fieldsMap);
     }
 
     /**
@@ -51,9 +50,129 @@ public class FsTableUtil {
      * @param ignoreUniqueFields 计算唯一标识时忽略的字段列表
      * @return 飞书表格数据列表
      */
-    public static List<FsTableData> getFsTableData(Sheet sheet, String spreadsheetToken, TableConf tableConf, List<String> ignoreUniqueFields) {
-
+    public static Map<String, List<FsTableData>> getGroupFsTableData(Sheet sheet, String spreadsheetToken, TableConf tableConf, List<String> ignoreUniqueFields, Map<String, FieldProperty> fieldsMap) {
         // 计算数据范围
+        List<List<Object>> values = getSourceTableValues(sheet, spreadsheetToken);
+
+        // 获取飞书表格数据
+        TableData tableData = processSheetData(sheet, values);
+
+        String[] uniKeys = tableConf.uniKeys();
+        Set<String> uniKeyNames = getUniKeyNames(fieldsMap, uniKeys);
+
+        List<FsTableData> dataList = getFsTableData(tableData, ignoreUniqueFields);
+        Map<String, String> titleMap = new HashMap<>();
+        Map<String, List<String>> categoryPositionMap = new HashMap<>();
+        dataList.stream().filter(d -> d.getRow() == (tableConf.titleRow() - 2)).findFirst().ifPresent(d -> {
+            Map<String, String> map = (Map<String, String>) d.getData();
+            map.forEach((k, v) -> {
+                if (v != null && !v.isEmpty()) {
+                    categoryPositionMap.computeIfAbsent(v, k1 -> new ArrayList<>()).add(k);
+                }
+            });
+        });
+
+        dataList.stream().filter(d -> d.getRow() == (tableConf.titleRow() - 1)).findFirst()
+                .ifPresent(d -> {
+                    Map<String, String> map = (Map<String, String>) d.getData();
+                    map.forEach((k, v) -> {
+                        if (v != null && !v.isEmpty()) {
+                            titleMap.put(k + "_" + v, v);
+                        } else {
+                            titleMap.put(k, v);
+                        }
+                    });
+                });
+
+        List<FsTableData> fsTableDataList = dataList.stream().filter(fsTableData -> fsTableData.getRow() >= (tableConf.headLine() -1)).map(item -> {
+            Map<String, Object> resultMap = new HashMap<>();
+
+            Map<String, Object> map = (Map<String, Object>) item.getData();
+            map.forEach((k, v) -> {
+                titleMap.forEach((k1, v1) -> {
+                    if (k1.startsWith(k)) {
+                        resultMap.put(k1, v);
+                    }
+                });
+            });
+            item.setData(resultMap);
+            return item;
+        }).collect(Collectors.toList());
+
+        Map<String, List<FsTableData>> dataMap = new HashMap<>();
+        categoryPositionMap.forEach((k1, v1) -> {
+            List<FsTableData> fsList = new ArrayList<>();
+
+            for (FsTableData fsTableData : fsTableDataList) {
+                Map<String, Object> resultMap = new HashMap<>();
+                Map<String, String> fieldsPositionMap = new HashMap<>();
+                Map<String, Object> data = (Map<String, Object>) fsTableData.getData();
+                data.forEach((k, v) -> {
+                    if (k != null) {
+                        String[] split = k.split("_");
+                        if (v1.contains(split[0]) && split.length > 1) {
+                            resultMap.put(split[1], v);
+                            fieldsPositionMap.put(split[1], split[0]);
+                        }
+                    }
+                });
+
+                if(areAllValuesNullOrBlank(resultMap)) {
+                    continue;
+                }
+
+                String jsonStr;
+                if (!uniKeyNames.isEmpty()) {
+                    List<Object> uniKeyValues = new ArrayList<>();
+                    for (String key : uniKeyNames) {
+                        if (resultMap.containsKey(key)) {
+                            uniKeyValues.add(resultMap.get(key));
+                        }
+                    }
+                    jsonStr = StringUtil.listToJson(uniKeyValues);
+                } else {
+                    if (!ignoreUniqueFields.isEmpty()) {
+                        Map<String, Object> clone = new HashMap<>(resultMap);
+                        ignoreUniqueFields.forEach(clone::remove);
+                        jsonStr = StringUtil.mapToJson(clone);
+                    } else {
+                        jsonStr = StringUtil.mapToJson(resultMap);
+                    }
+                }
+
+                FsTableData fsData = new FsTableData();
+                fsData.setRow(fsTableData.getRow());
+                String uniqueId = StringUtil.getSHA256(jsonStr);
+                fsData.setUniqueId(uniqueId);
+                fsData.setData(resultMap);
+                fsData.setFieldsPositionMap(fieldsPositionMap);
+                fsList.add(fsData);
+            }
+            dataMap.put(k1, fsList);
+        });
+        return dataMap;
+    }
+
+    @NotNull
+    private static Set<String> getUniKeyNames(Map<String, FieldProperty> fieldsMap, String[] uniKeys) {
+        Set<String> uniKeyNames = new HashSet<>();
+        fieldsMap.forEach((k, v) -> {
+            String field = v.getField();
+            if (field != null && !field.isEmpty()) {
+                if (Arrays.asList(uniKeys).contains(field)) {
+                    uniKeyNames.add(k);
+                }
+
+                if (Arrays.asList(uniKeys).contains(StringUtil.toUnderscoreCase(field))) {
+                    uniKeyNames.add(k);
+                }
+            }
+        });
+        return uniKeyNames;
+    }
+
+    @NotNull
+    private static List<List<Object>> getSourceTableValues(Sheet sheet, String spreadsheetToken) {
         GridProperties gridProperties = sheet.getGridProperties();
         int totalRow = gridProperties.getRowCount();
         int rowCount = Math.min(totalRow, 100); // 每次读取的行数
@@ -80,16 +199,40 @@ public class FsTableUtil {
                 }
             }
         }
+        return values;
+    }
+
+    /**
+     * 获取飞书表格数据（支持忽略唯一字段）
+     *
+     * @param sheet 工作表对象
+     * @param spreadsheetToken 电子表格Token
+     * @param tableConf 表格配置
+     * @param ignoreUniqueFields 计算唯一标识时忽略的字段列表
+     * @return 飞书表格数据列表
+     */
+    public static List<FsTableData> getFsTableData(Sheet sheet, String spreadsheetToken, TableConf tableConf, List<String> ignoreUniqueFields, Map<String, FieldProperty> fieldsMap) {
+
+        // 计算数据范围
+        List<List<Object>> values = getSourceTableValues(sheet, spreadsheetToken);
 
         // 获取飞书表格数据
         TableData tableData = processSheetData(sheet, values);
 
+        String[] uniKeys = tableConf.uniKeys();
+        Set<String> uniKeyNames = getUniKeyNames(fieldsMap, uniKeys);
         List<FsTableData> dataList = getFsTableData(tableData, ignoreUniqueFields);
         Map<String, String> titleMap = new HashMap<>();
+        Map<String, String> fieldsPositionMap = new HashMap<>();
 
         dataList.stream().filter(d -> d.getRow() == (tableConf.titleRow() - 1)).findFirst()
                 .ifPresent(d -> {
                     Map<String, String> map = (Map<String, String>) d.getData();
+                    map.forEach((k, v) -> {
+                        if (v != null && !v.isEmpty()) {
+                            fieldsPositionMap.put(v, k);
+                        };
+                    });
                     titleMap.putAll(map);
                 });
         return dataList.stream().filter(fsTableData -> fsTableData.getRow() >= tableConf.headLine()).map(item -> {
@@ -103,6 +246,24 @@ public class FsTableUtil {
                 }
             });
             item.setData(resultMap);
+            item.setFieldsPositionMap(fieldsPositionMap);
+
+            String jsonStr = null;
+            if (!uniKeyNames.isEmpty()) {
+                List<Object> uniKeyValues = new ArrayList<>();
+                for (String key : uniKeyNames) {
+                    if (resultMap.containsKey(key)) {
+                        uniKeyValues.add(resultMap.get(key));
+                    }
+                }
+                jsonStr = StringUtil.listToJson(uniKeyValues);
+            }
+
+            if (jsonStr != null) {
+                String uniqueId = StringUtil.getSHA256(jsonStr);
+                item.setUniqueId(uniqueId);
+            }
+
             return item;
         }).collect(Collectors.toList());
     }
@@ -113,7 +274,7 @@ public class FsTableUtil {
      * @param tableData 表格数据对象
      * @return 飞书表格数据列表
      */
-    private static List<FsTableData> getFsTableData(TableData tableData) {
+    public static List<FsTableData> getFsTableData(TableData tableData) {
         return getFsTableData(tableData, new ArrayList<>());
     }
 
@@ -124,7 +285,7 @@ public class FsTableUtil {
      * @param ignoreUniqueFields 忽略的唯一字段列表
      * @return 飞书表格数据列表
      */
-    private static List<FsTableData> getFsTableData(TableData tableData, List<String> ignoreUniqueFields) {
+    public static List<FsTableData> getFsTableData(TableData tableData, List<String> ignoreUniqueFields) {
 
         List<FsTableData> fsTableList = new LinkedList<>();
         // 5. 访问补齐后的数据
@@ -381,6 +542,57 @@ public class FsTableUtil {
         });
     }
 
+    public static void setTableOptions(String spreadsheetToken, String[] headers, Map<String, FieldProperty> fieldsMap,
+                                       String sheetId, boolean enableDesc, Map<String, Object> customProperties) {
+
+        int line = getMaxLevel(fieldsMap) + (enableDesc ? 3 : 2);
+        fieldsMap.forEach((field, fieldProperty) -> {
+            TableProperty tableProperty = fieldProperty.getTableProperty();
+            if (tableProperty != null) {
+                List<String> positions = new ArrayList<>();
+                for (String obj : headers) {
+                    if (obj != null && obj.startsWith(field)) {
+                        String[] split = obj.split("_");
+                        if (split.length > 1) {
+                            positions.add(split[1]);
+                        }
+                    }
+                }
+
+                if (!positions.isEmpty()) {
+                    positions.forEach(position -> {
+                        if (tableProperty.enumClass() != BaseEnum.class) {
+                            FsApiUtil.setOptions(sheetId, FsClient.getInstance().getClient(), spreadsheetToken, tableProperty.type() == TypeEnum.MULTI_SELECT, position + line, position + 200,
+                                    Arrays.stream(tableProperty.enumClass().getEnumConstants()).map(BaseEnum::getDesc).collect(Collectors.toList()));
+                        }
+
+                        if (tableProperty.optionsClass() != OptionsValueProcess.class) {
+                            List<String> result;
+                            Class<? extends OptionsValueProcess> optionsClass = tableProperty.optionsClass();
+                            try {
+                                Map<String, Object> properties = new HashMap<>();
+                                if (customProperties == null) {
+                                    properties.put("_field", fieldProperty);
+                                } else {
+                                    customProperties.put("_field", fieldProperty);
+                                }
+                                OptionsValueProcess optionsValueProcess = optionsClass.getDeclaredConstructor().newInstance();
+                                result = (List<String>) optionsValueProcess.process(customProperties == null ? properties : customProperties);
+                            } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
+                                throw new RuntimeException(e);
+                            }
+
+                            if (result != null && !result.isEmpty()) {
+                                FsApiUtil.setOptions(sheetId, FsClient.getInstance().getClient(), spreadsheetToken, tableProperty.type() == TypeEnum.MULTI_SELECT, position + line, position + 200,
+                                        result);
+                            }
+                        }
+                    });
+                }
+            }
+        });
+    }
+
     public static void setTableOptions(String spreadsheetToken, List<String> headers, Map<String, FieldProperty> fieldsMap, String sheetId, boolean enableDesc) {
         setTableOptions(spreadsheetToken, headers, fieldsMap, sheetId, enableDesc, null);
     }
@@ -389,6 +601,81 @@ public class FsTableUtil {
                                                                          Map<String, FieldProperty> fieldsMap, TableConf tableConf) {
         return getHeadTemplateBuilder(sheetId, headers, fieldsMap, tableConf, null);
     }
+
+    public static CustomValueService.ValueRequest getHeadTemplateBuilder(String sheetId, List<String> headers, List<String> headerList, Map<String, FieldProperty> fieldsMap,
+                                                                         TableConf tableConf, Map<String, String> fieldDescriptions, List<String> groupFields) {
+        String position = FsTableUtil.getColumnNameByNuNumber(headerList.size());
+
+        CustomValueService.ValueRequest.BatchPutValuesBuilder batchPutValuesBuilder
+                = CustomValueService.ValueRequest.batchPutValues();
+
+        int row = tableConf.titleRow();
+        if (tableConf.enableDesc()) {
+            batchPutValuesBuilder.addRange(sheetId + "!A" + (row - 1) + ":" + position + (row + 1));
+            batchPutValuesBuilder.addRow(getGroupArray(headers, headerList.size(), groupFields));
+            batchPutValuesBuilder.addRow(headerList.toArray());
+            batchPutValuesBuilder.addRow(getDescArray(headerList, fieldsMap, fieldDescriptions));
+        } else {
+            batchPutValuesBuilder.addRange(sheetId + "!A" + (row - 1) + ":" + position + row);
+            batchPutValuesBuilder.addRow(getGroupArray(headers, headerList.size(), groupFields));
+            batchPutValuesBuilder.addRow(headerList.toArray());
+        }
+        return batchPutValuesBuilder.build();
+    }
+
+    private static Object[] getGroupArray(List<String> headers, int size, List<String> groupFields) {
+        Object[] groupArray = new Object[size];
+        int index = 0;
+
+        for (int i = 0; i < groupFields.size(); i++) {
+            if (i > 0) {
+                // 在非第一个groupField前添加null分隔符
+                groupArray[index++] = null;
+            }
+
+            String groupField = groupFields.get(i);
+            // 为当前groupField填充headers长度的数据
+            for (int j = 0; j < headers.size(); j++) {
+                groupArray[index++] = groupField;
+            }
+        }
+
+        return groupArray;
+    }
+
+    /**
+     * 根据headers和groupFields生成带表格列标识的数据
+     *
+     * @param headers 表头列表
+     * @param groupFields 分组字段列表
+     * @return 带表格列标识的数据数组
+     */
+    public static String[] generateHeaderWithColumnIdentifiers(List<String> headers, List<String> groupFields) {
+        // 计算结果数组大小
+        // 每个groupField需要headers.size()个位置，加上(groupFields.size()-1)个null分隔符
+        int size = groupFields.size() * headers.size() + (groupFields.size() - 1);
+        String[] result = new String[size];
+
+        int index = 0;
+
+        for (int i = 0; i < groupFields.size(); i++) {
+            // 在非第一个groupField前添加null分隔符
+            if (i > 0) {
+                result[index++] = null;
+            }
+
+            // 为当前groupField填充headers长度的数据
+            for (int j = 0; j < headers.size(); j++) {
+                // 获取对应的列标识（A, B, C, ...）
+                String columnIdentifier = getColumnName(index);
+                // 拼接header和列标识
+                result[index++] = headers.get(j) + "_" + columnIdentifier;
+            }
+        }
+
+        return result;
+    }
+
 
     public static CustomValueService.ValueRequest getHeadTemplateBuilder(String sheetId, List<String> headers,
                                                                          Map<String, FieldProperty> fieldsMap, TableConf tableConf, Map<String, String> fieldDescriptions) {
@@ -530,6 +817,53 @@ public class FsTableUtil {
 
         return styleCellsBatchBuilder;
     }
+
+    public static CustomCellService.StyleCellsBatchBuilder getDefaultTableStyle(String sheetId, String[] position, TableConf tableConf) {
+        CustomCellService.StyleCellsBatchBuilder styleCellsBatchBuilder = CustomCellService.CellRequest.styleCellsBatch()
+                .addRange(sheetId, position[0] + 1, position[1] + 2)
+                .backColor(tableConf.headBackColor())
+                .foreColor(tableConf.headFontColor());
+
+        return styleCellsBatchBuilder;
+    }
+
+    public static Map<String, String[]> calculateGroupPositions(List<String> headers, List<String> groupFields) {
+        Map<String, String[]> positions = new HashMap<>();
+        int index = 0;
+
+        for (int i = 0; i < groupFields.size(); i++) {
+            String groupField = groupFields.get(i);
+            // 计算开始位置
+            String startPosition = getColumnName(index);
+            // 计算结束位置
+            index += headers.size() - 1;
+            String endPosition = getColumnName(index);
+
+            positions.put(groupField, new String[]{startPosition, endPosition});
+
+            // 如果不是最后一个groupField，跳过null分隔符
+            if (i < groupFields.size() - 1) {
+                index += 2; // 跳过当前末尾位置和null分隔符
+            } else {
+                index += 1; // 只跳过当前末尾位置
+            }
+        }
+
+        return positions;
+    }
+
+    public static List<String> getGroupHeaders(List<String> groupFieldList, List<String> headers) {
+        List<String> headerList = new ArrayList<>();
+
+        groupFieldList.forEach(groupField -> {
+            if (!headerList.isEmpty()) {
+                headerList.add(null);
+            }
+            headerList.addAll(headers);
+        });
+        return headerList;
+    }
+
 
     /**
      * 根据层级分组字段属性，并按order排序
@@ -686,6 +1020,22 @@ public class FsTableUtil {
         }
 
         return result;
+    }
+
+    //
+    public static List<CustomCellService.CellRequest> getMergeCell(String sheetId, Collection<String[]> positions) {
+        List<CustomCellService.CellRequest> mergeRequests = new ArrayList<>();
+        for (String[] position : positions) {
+            if (position.length == 2) {
+                CustomCellService.CellRequest mergeRequest = CustomCellService.CellRequest.mergeCells()
+                        .sheetId(sheetId)
+                        .startPosition(position[0] + 1)
+                        .endPosition(position[1] + 1)
+                        .build();
+                mergeRequests.add(mergeRequest);
+            }
+        }
+        return mergeRequests;
     }
 
     public static List<CustomCellService.CellRequest> getMergeCell(String sheetId, Map<String, FieldProperty> fieldsMap) {
@@ -936,5 +1286,24 @@ public class FsTableUtil {
      */
     public static String addLineBreaksPer8Chars(String text) {
         return addLineBreaks(text, 8);
+    }
+
+    public static boolean areAllValuesNullOrBlank(Map<String, Object> map) {
+        if (map == null || map.isEmpty()) {
+            return true;
+        }
+
+        for (Object value : map.values()) {
+            if (value != null) {
+                if (value instanceof String) {
+                    if (!((String) value).isEmpty()) {
+                        return false;
+                    }
+                } else {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 }

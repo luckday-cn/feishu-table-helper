@@ -10,10 +10,7 @@ import cn.isliu.core.utils.FsTableUtil;
 import cn.isliu.core.utils.PropertyUtil;
 import cn.isliu.core.utils.StringUtil;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -116,7 +113,9 @@ public class SheetBuilder<T> {
      * @return SheetBuilder实例，支持链式调用
      */
     public SheetBuilder<T> fieldDescription(Map<String, String> fieldDescriptions) {
-        this.fieldDescriptions.putAll(fieldDescriptions);
+        if (fieldDescriptions != null && !fieldDescriptions.isEmpty()) {
+            this.fieldDescriptions.putAll(fieldDescriptions);
+        }
         return this;
     }
 
@@ -172,24 +171,75 @@ public class SheetBuilder<T> {
         // 2、添加表头数据
         FsApiUtil.putValues(spreadsheetToken, FsTableUtil.getHeadTemplateBuilder(sheetId, headers, fieldsMap, tableConf, fieldDescriptions), client);
 
-        // 3、设置表格样式
-        FsApiUtil.setTableStyle(FsTableUtil.getDefaultTableStyle(sheetId, fieldsMap, tableConf), client, spreadsheetToken);
-
-        // 4、合并单元格
-        List<CustomCellService.CellRequest> mergeCell = FsTableUtil.getMergeCell(sheetId, fieldsMap);
-        if (!mergeCell.isEmpty()) {
-            mergeCell.forEach(cell -> FsApiUtil.mergeCells(cell, client, spreadsheetToken));
-        }
-
-        // 5、设置单元格为文本格式
+        // 3、设置单元格为文本格式
         if (tableConf.isText()) {
             String column = FsTableUtil.getColumnNameByNuNumber(headers.size());
             FsApiUtil.setCellType(sheetId, "@", "A1", column + 200, client, spreadsheetToken);
         }
 
+        // 4、设置表格样式
+        FsApiUtil.setTableStyle(FsTableUtil.getDefaultTableStyle(sheetId, fieldsMap, tableConf), client, spreadsheetToken);
+
+        // 5、合并单元格
+        List<CustomCellService.CellRequest> mergeCell = FsTableUtil.getMergeCell(sheetId, fieldsMap);
+        if (!mergeCell.isEmpty()) {
+            mergeCell.forEach(cell -> FsApiUtil.mergeCells(cell, client, spreadsheetToken));
+        }
+
         // 6、设置表格下拉
         try {
             FsTableUtil.setTableOptions(spreadsheetToken, headers, fieldsMap, sheetId, tableConf.enableDesc(), customProperties);
+        } catch (Exception e) {
+            Logger.getLogger(SheetBuilder.class.getName()).log(Level.SEVERE,"【表格构建器】设置表格下拉异常！sheetId:" + sheetId + ", 错误信息：{}", e.getMessage());
+        }
+
+        return sheetId;
+    }
+
+    public String groupBuild(String ...groupFields) {
+        // 获取所有字段映射
+        Map<String, FieldProperty> allFieldsMap = PropertyUtil.getTablePropertyFieldsMap(clazz);
+
+        // 根据includeFields过滤字段映射
+        Map<String, FieldProperty> fieldsMap = filterFieldsMap(allFieldsMap);
+
+        // 生成表头
+        List<String> headers = PropertyUtil.getHeaders(fieldsMap, includeFields);
+
+        // 获取表格配置
+        TableConf tableConf = PropertyUtil.getTableConf(clazz);
+
+        // 创建飞书客户端
+        FeishuClient client = FsClient.getInstance().getClient();
+
+        // 1、创建sheet
+        String sheetId = FsApiUtil.createSheet(sheetName, client, spreadsheetToken);
+
+        // 2、添加表头数据
+        List<String> groupFieldList = new ArrayList<>(Arrays.asList(groupFields));
+        List<String> headerList = FsTableUtil.getGroupHeaders(groupFieldList, headers);
+        FsApiUtil.putValues(spreadsheetToken, FsTableUtil.getHeadTemplateBuilder(sheetId, headers, headerList, fieldsMap, tableConf, fieldDescriptions, groupFieldList), client);
+
+        // 3、设置单元格为文本格式
+        if (tableConf.isText()) {
+            String column = FsTableUtil.getColumnNameByNuNumber(headerList.size());
+            FsApiUtil.setCellType(sheetId, "@", "A1", column + 200, client, spreadsheetToken);
+        }
+
+        // 4、设置表格样式
+        Map<String, String[]> positions = FsTableUtil.calculateGroupPositions(headers, groupFieldList);
+        positions.forEach((key, value) -> FsApiUtil.setTableStyle(FsTableUtil.getDefaultTableStyle(sheetId, value, tableConf), client, spreadsheetToken));
+
+        // 5、合并单元格
+        List<CustomCellService.CellRequest> mergeCell = FsTableUtil.getMergeCell(sheetId, positions.values());
+        if (!mergeCell.isEmpty()) {
+            mergeCell.forEach(cell -> FsApiUtil.mergeCells(cell, client, spreadsheetToken));
+        }
+
+        // 6、设置表格下拉
+        try {
+            String[] headerWithColumnIdentifiers = FsTableUtil.generateHeaderWithColumnIdentifiers(headers, groupFieldList);
+            FsTableUtil.setTableOptions(spreadsheetToken, headerWithColumnIdentifiers, fieldsMap, sheetId, tableConf.enableDesc(), customProperties);
         } catch (Exception e) {
             Logger.getLogger(SheetBuilder.class.getName()).log(Level.SEVERE,"【表格构建器】设置表格下拉异常！sheetId:" + sheetId + ", 错误信息：{}", e.getMessage());
         }
@@ -217,7 +267,7 @@ public class SheetBuilder<T> {
                     if (field.isEmpty()) {
                         return false;
                     }
-                    return includeFields.contains(StringUtil.toUnderscoreCase(field));
+                    return includeFields.contains(field) || includeFields.contains(StringUtil.toUnderscoreCase(field));
                 })
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
