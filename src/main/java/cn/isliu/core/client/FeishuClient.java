@@ -22,6 +22,7 @@ public class FeishuClient {
     private final OkHttpClient httpClient;
     private final String appId;
     private final String appSecret;
+    private final boolean closeOfficialPool;
 
     // 自定义服务，处理官方SDK未覆盖的API
     private volatile CustomSheetService customSheetService;
@@ -37,7 +38,17 @@ public class FeishuClient {
         this.appSecret = appSecret;
         this.officialClient = officialClient;
         this.httpClient = httpClient;
+        this.closeOfficialPool = false;
     }
+
+    private FeishuClient(String appId, String appSecret, Client officialClient, OkHttpClient httpClient, boolean closeOfficialPool) {
+        this.appId = appId;
+        this.appSecret = appSecret;
+        this.officialClient = officialClient;
+        this.httpClient = httpClient;
+        this.closeOfficialPool = closeOfficialPool;
+    }
+
 
     /**
      * 创建客户端构建器
@@ -217,11 +228,21 @@ public class FeishuClient {
     }
 
     /**
+     * 获取是否关闭官方Client连接池
+     *
+     * @return 是否关闭官方Client连接池
+     */
+    public boolean getCloseOfficialPool() {
+        return closeOfficialPool;
+    }
+
+    /**
      * FeishuClient构建器
      */
     public static class Builder {
         private final String appId;
         private final String appSecret;
+        private boolean closeOfficialPool = false;
         private OkHttpClient.Builder httpClientBuilder;
         private AppType appType = AppType.SELF_BUILT;
         private boolean logReqAtDebug = false;
@@ -268,6 +289,11 @@ public class FeishuClient {
             return this;
         }
 
+        public Builder closeOfficialPool(boolean closeOfficialPool) {
+            this.closeOfficialPool = closeOfficialPool;
+            return this;
+        }
+
         /**
          * 构建FeishuClient实例
          *
@@ -281,7 +307,7 @@ public class FeishuClient {
             // 构建OkHttpClient
             OkHttpClient httpClient = httpClientBuilder.build();
 
-            return new FeishuClient(appId, appSecret, officialClient, httpClient);
+            return new FeishuClient(appId, appSecret, officialClient, httpClient, closeOfficialPool);
         }
     }
 }

@@ -14,14 +14,13 @@ import cn.isliu.core.service.*;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import com.lark.oapi.core.request.RequestOptions;
 import com.lark.oapi.service.drive.v1.model.*;
 import com.lark.oapi.service.sheets.v3.model.*;
 
 import java.io.IOException;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
-import cn.isliu.core.logging.FsLogger;
 import cn.isliu.core.enums.ErrorCode;
 
 
@@ -33,19 +32,24 @@ import cn.isliu.core.enums.ErrorCode;
 public class FsApiUtil {
 
     private static final Gson gson = new Gson();
-    private static final String REQ_TYPE = "JSON_STR";
     public static final int DEFAULT_ROW_NUM = 1000;
+
+    public static final Map<String, List<String>> m = new HashMap<String, List<String>>() {
+        {
+            put("Connection", Collections.singletonList("close"));
+        }
+    };
 
     /**
      * 获取工作表数据
-     * <p>
+     *
      * 从指定的飞书表格中读取指定范围的数据
      *
-     * @param sheetId          工作表ID
+     * @param sheetId 工作表ID
      * @param spreadsheetToken 电子表格Token
-     * @param startPosition    起始位置（如"A1"）
-     * @param endPosition      结束位置（如"Z100"）
-     * @param client           飞书客户端
+     * @param startPosition 起始位置（如"A1"）
+     * @param endPosition 结束位置（如"Z100"）
+     * @param client 飞书客户端
      * @return 表格数据对象
      */
     public static ValuesBatch getSheetData(String sheetId, String spreadsheetToken, String startPosition, String endPosition, FeishuClient client) {
@@ -78,11 +82,11 @@ public class FsApiUtil {
 
     /**
      * 获取工作表元数据
-     * <p>
+     *
      * 获取指定工作表的元数据信息，包括行列数、工作表名称等
      *
-     * @param sheetId          工作表ID
-     * @param client           飞书客户端
+     * @param sheetId 工作表ID
+     * @param client 飞书客户端
      * @param spreadsheetToken 电子表格Token
      * @return 工作表对象
      */
@@ -92,8 +96,8 @@ public class FsApiUtil {
                     .spreadsheetToken(spreadsheetToken)
                     .build();
 
-            // 发起请求
-            QuerySpreadsheetSheetResp resp = client.sheets().v3().spreadsheetSheet().query(req);
+            QuerySpreadsheetSheetResp resp = client.sheets().v3().spreadsheetSheet().query(req, client.getCloseOfficialPool()
+                    ? RequestOptions.newBuilder().headers(m).build() : null);
 
             // 处理服务端错误
             if (resp.success()) {
@@ -121,6 +125,8 @@ public class FsApiUtil {
     }
 
     public static void setTableStyle(CustomCellService.StyleCellsBatchBuilder styleCellsBatchBuilder, FeishuClient client, String spreadsheetToken) {
+        FsLogger.debug("【飞书表格】 写入表格样式参数：{}", gson.toJson(styleCellsBatchBuilder));
+
         try {
             CustomCellService.CellBatchUpdateRequest batchUpdateRequest = CustomCellService.CellBatchUpdateRequest.newBuilder()
                     .addRequest(styleCellsBatchBuilder.build())
@@ -157,7 +163,7 @@ public class FsApiUtil {
 
     /**
      * 获取根目录Token
-     * <p>
+     *
      * 调用飞书开放平台API获取当前租户的根目录token，用于后续的文件夹和文件操作
      * API接口: GET https://open.feishu.cn/open-apis/drive/v1/files/root_folder/meta
      *
@@ -195,7 +201,8 @@ public class FsApiUtil {
                     .build();
 
             // 发起请求
-            CreateFolderFileResp resp = client.drive().v1().file().createFolder(req);
+            CreateFolderFileResp resp = client.drive().v1().file().createFolder(req, client.getCloseOfficialPool()
+                    ? RequestOptions.newBuilder().headers(m).build() : null);
             if (resp.success()) {
                 FsLogger.info("【飞书表格】 创建文件夹成功！ {}", gson.toJson(resp));
                 return resp.getData();
@@ -218,7 +225,8 @@ public class FsApiUtil {
                             .build())
                     .build();
 
-            CreateSpreadsheetResp resp = client.sheets().v3().spreadsheet().create(req);
+            CreateSpreadsheetResp resp = client.sheets().v3().spreadsheet().create(req, client.getCloseOfficialPool()
+                    ? RequestOptions.newBuilder().headers(m).build() : null);
             if (resp.success()) {
                 FsLogger.info("【飞书表格】 创建表格成功！ {}", gson.toJson(resp));
                 return resp.getData();
@@ -266,7 +274,7 @@ public class FsApiUtil {
             String message = e.getMessage();
             FsLogger.warn("【飞书表格】 创建 sheet 异常！错误信息：{}", message);
 
-            throw new FsHelperException(message != null && message.contains("403") ? "请按照上方操作，当前智投无法操作对应文档哦" : "【飞书表格】 创建 sheet 异常！");
+            throw new FsHelperException(message != null && message.contains("403")? "请按照上方操作，当前智投无法操作对应文档哦" : "【飞书表格】 创建 sheet 异常！");
         }
         return sheetId;
     }
@@ -387,7 +395,8 @@ public class FsApiUtil {
                     .build();
 
             // 发起请求
-            DownloadMediaResp resp = client.drive().v1().media().download(req);
+            DownloadMediaResp resp = client.drive().v1().media().download(req, client.getCloseOfficialPool()
+                    ? RequestOptions.newBuilder().headers(m).build() : null);
 
             // 处理服务端错误
             if (resp.success()) {
@@ -400,14 +409,15 @@ public class FsApiUtil {
         }
     }
 
-    public static String downloadTmpMaterialUrl(String fileToken, FeishuClient client) {
+    public static String downloadTmpMaterialUrl(String fileToken,  FeishuClient client) {
         String tmpUrl = "";
         try {
             BatchGetTmpDownloadUrlMediaReq req = BatchGetTmpDownloadUrlMediaReq.newBuilder()
                     .fileTokens(new String[]{fileToken})
                     .build();
 
-            BatchGetTmpDownloadUrlMediaResp resp = client.drive().v1().media().batchGetTmpDownloadUrl(req);
+            BatchGetTmpDownloadUrlMediaResp resp = client.drive().v1().media().batchGetTmpDownloadUrl(req, client.getCloseOfficialPool()
+                    ? RequestOptions.newBuilder().headers(m).build() : null);
 
             if (resp.success()) {
                 return resp.getData().getTmpDownloadUrls()[0].getTmpDownloadUrl();
@@ -421,7 +431,7 @@ public class FsApiUtil {
     }
 
     public static Object putValues(String spreadsheetToken, CustomValueService.ValueRequest putValuesBuilder, FeishuClient client) {
-        FsLogger.info("【飞书表格】 putValues 开始写入数据！参数：{}", gson.toJson(putValuesBuilder));
+        FsLogger.debug("【飞书表格】 putValues 开始写入数据！参数：{}", gson.toJson(putValuesBuilder));
 
         // 添加到批量请求中
         CustomValueService.ValueBatchUpdateRequest putDataRequest = CustomValueService.ValueBatchUpdateRequest.newBuilder()
@@ -466,7 +476,7 @@ public class FsApiUtil {
         }
     }
 
-    public static Object addRowColumns(String sheetId, String spreadsheetToken, String type, int length, FeishuClient client) {
+    public static Object addRowColumns(String sheetId, String spreadsheetToken, String type, int length,FeishuClient client) {
 
         CustomDimensionService.DimensionBatchUpdateRequest batchRequest = CustomDimensionService.DimensionBatchUpdateRequest.newBuilder()
                 .addRequest(CustomDimensionService.DimensionRequest.addDimension()
@@ -497,7 +507,8 @@ public class FsApiUtil {
                     .build();
 
             // 发起请求
-            GetSpreadsheetResp resp = client.sheets().v3().spreadsheet().get(req);
+            GetSpreadsheetResp resp = client.sheets().v3().spreadsheet().get(req, client.getCloseOfficialPool()
+                    ? RequestOptions.newBuilder().headers(m).build() : null);
 
             // 处理服务端错误
             if (resp.success()) {
@@ -512,13 +523,15 @@ public class FsApiUtil {
     }
 
     /**
-     * 字符串类型： formatter: "@"
+     *  字符串类型： formatter: "@"
      */
     public static void setCellType(String sheetId, String formatter, String startPosition, String endPosition, FeishuClient client, String spreadsheetToken) {
         try {
             CustomCellService.CellBatchUpdateRequest batchUpdateRequest = CustomCellService.CellBatchUpdateRequest.newBuilder()
                     .addRequest(CustomCellService.CellRequest.styleCells()
                             .formatter(formatter).sheetId(sheetId).startPosition(startPosition).endPosition(endPosition)
+                            .backColor("#ffffff")
+                            .bold(false)
                             .build())
                     .build();
 
@@ -533,7 +546,7 @@ public class FsApiUtil {
         }
     }
 
-    public static Object imageUpload(byte[] imageData, String fileName, String position, String sheetId, String spreadsheetToken, FeishuClient client) {
+    public static Object imageUpload(byte[] imageData, String fileName, String position ,String sheetId, String spreadsheetToken, FeishuClient client) {
         try {
 
             CustomValueService.ValueRequest imageRequest = CustomValueService.ValueRequest.imageValues()
@@ -553,7 +566,7 @@ public class FsApiUtil {
             }
             return imageResp.getData();
         } catch (Exception e) {
-            FsLogger.error(ErrorCode.API_SERVER_ERROR, "【飞书表格】 文件上传异常！" + e.getMessage(), fileName, e);
+            FsLogger.error(ErrorCode.API_SERVER_ERROR,"【飞书表格】 文件上传异常！" + e.getMessage(), fileName, e);
         }
 
         return null;

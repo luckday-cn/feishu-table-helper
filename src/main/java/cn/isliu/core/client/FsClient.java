@@ -9,6 +9,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class FsClient implements AutoCloseable {
 
+
     private static volatile FsClient instance;
     private final ThreadLocal<FeishuClient> clientHolder = new ThreadLocal<>();
     private final Map<String, FeishuClient> clientMap = new ConcurrentHashMap<>();
@@ -53,6 +54,10 @@ public class FsClient implements AutoCloseable {
      * @return 初始化的FeishuClient实例
      */
     public FeishuClient initializeClient(String appId, String appSecret) {
+        return initializeClient(appId, appSecret, false);
+    }
+
+    public FeishuClient initializeClient(String appId, String appSecret, boolean closeOfficialPool) {
         if (appId == null || appId.trim().isEmpty()) {
             throw new IllegalArgumentException("appId cannot be null or empty");
         }
@@ -64,7 +69,7 @@ public class FsClient implements AutoCloseable {
             clientHolder.set(feishuClient);
             return feishuClient;
         } else {
-            FeishuClient client = FeishuClient.newBuilder(appId, appSecret).build();
+            FeishuClient client = FeishuClient.newBuilder(appId, appSecret).closeOfficialPool(closeOfficialPool).build();
             clientMap.put(appId + "_" + appSecret, client);
             clientHolder.set(client);
             return client;
