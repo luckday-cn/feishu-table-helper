@@ -198,6 +198,10 @@ public class WriteBuilder<T> {
                 values.forEach((field, fieldValue) -> {
                     String position = finalTitlePostionMap.get(field);
 
+                    if (position == null || position.isEmpty()) {
+                        return;
+                    }
+
                     if (fieldValue instanceof FileData) {
                         FileData fileData = (FileData) fieldValue;
                         String fileType = fileData.getFileType();
@@ -217,8 +221,12 @@ public class WriteBuilder<T> {
                 int rowCou = rowCount.incrementAndGet();
                 Map<String, String> finalTitlePostionMap1 = titlePostionMap;
                 values.forEach((field, fieldValue) -> {
-
                     String position = finalTitlePostionMap1.get(field);
+
+                    if (position == null || position.isEmpty()) {
+                        return;
+                    }
+
                     if (fieldValue instanceof FileData) {
                         FileData fileData = (FileData) fieldValue;
                         fileData.setSheetId(sheetId);

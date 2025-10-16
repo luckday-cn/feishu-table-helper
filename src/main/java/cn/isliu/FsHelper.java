@@ -5,11 +5,13 @@ import cn.isliu.core.FileData;
 import cn.isliu.core.FsTableData;
 import cn.isliu.core.Sheet;
 import cn.isliu.core.annotation.TableConf;
+import cn.isliu.core.builder.MapWriteBuilder;
 import cn.isliu.core.builder.ReadBuilder;
 import cn.isliu.core.builder.SheetBuilder;
 import cn.isliu.core.builder.WriteBuilder;
 import cn.isliu.core.client.FeishuClient;
 import cn.isliu.core.client.FsClient;
+import cn.isliu.core.config.MapTableConfig;
 import cn.isliu.core.enums.ErrorCode;
 import cn.isliu.core.enums.FileType;
 import cn.isliu.core.logging.FsLogger;
@@ -216,6 +218,11 @@ public class FsHelper {
                 rowNum.set(rowNum.get() + 1);
                 values.forEach((field, fieldValue) -> {
                     String position = titlePostionMap.get(field);
+
+                    if (position == null || position.isEmpty()) {
+                        return;
+                    }
+
                     if (fieldValue instanceof FileData) {
                         FileData fileData = (FileData) fieldValue;
                         String fileType = fileData.getFileType();
@@ -236,6 +243,11 @@ public class FsHelper {
                 int rowCou = rowCount.incrementAndGet();
                 values.forEach((field, fieldValue) -> {
                     String position = titlePostionMap.get(field);
+
+                    if (position == null || position.isEmpty()) {
+                        return;
+                    }
+
                     if (fieldValue instanceof FileData) {
                         FileData fileData = (FileData) fieldValue;
                         fileData.setSheetId(sheetId);
@@ -285,5 +297,75 @@ public class FsHelper {
      */
     public static <T> WriteBuilder<T> writeBuilder(String sheetId, String spreadsheetToken, List<T> dataList) {
         return new WriteBuilder<>(sheetId, spreadsheetToken, dataList);
+    }
+
+    /**
+     * 将 Map 数据写入飞书表格
+     *
+     * 直接使用 Map 格式的数据写入飞书表格，无需定义实体类和注解。
+     * 适用于动态字段、临时数据写入等场景。
+     *
+     * 使用示例：
+     * <pre>
+     * List&lt;Map&lt;String, Object&gt;&gt; dataList = new ArrayList&lt;&gt;();
+     * Map&lt;String, Object&gt; data = new HashMap&lt;&gt;();
+     * data.put("字段名1", "值1");
+     * data.put("字段名2", "值2");
+     * dataList.add(data);
+     *
+     * MapTableConfig config = MapTableConfig.builder()
+     *     .titleRow(2)
+     *     .headLine(3)
+     *     .addUniKeyName("字段名1")
+     *     .enableCover(true)
+     *     .build();
+     *
+     * FsHelper.writeMap(sheetId, spreadsheetToken, dataList, config);
+     * </pre>
+     *
+     * @param sheetId 工作表ID
+     * @param spreadsheetToken 电子表格Token
+     * @param dataList Map数据列表，每个Map的key为字段名，value为字段值
+     * @param config 表格配置，包含标题行、数据起始行、唯一键等配置信息
+     * @return 写入操作结果
+     */
+    public static Object writeMap(String sheetId, String spreadsheetToken,
+                                  List<Map<String, Object>> dataList, MapTableConfig config) {
+        return new MapWriteBuilder(sheetId, spreadsheetToken, dataList)
+                .config(config)
+                .build();
+    }
+
+    /**
+     * 创建 Map 数据写入构建器
+     *
+     * 返回一个 Map 数据写入构建器实例，支持链式调用和灵活配置。
+     * 相比直接使用 writeMap 方法，构建器方式提供了更灵活的配置方式。
+     *
+     * 使用示例：
+     * <pre>
+     * List&lt;Map&lt;String, Object&gt;&gt; dataList = new ArrayList&lt;&gt;();
+     * Map&lt;String, Object&gt; data = new HashMap&lt;&gt;();
+     * data.put("字段名1", "值1");
+     * data.put("字段名2", "值2");
+     * dataList.add(data);
+     *
+     * FsHelper.writeMapBuilder(sheetId, spreadsheetToken, dataList)
+     *     .titleRow(2)
+     *     .headLine(3)
+     *     .addUniKeyName("字段名1")
+     *     .enableCover(true)
+     *     .ignoreNotFound(false)
+     *     .build();
+     * </pre>
+     *
+     * @param sheetId 工作表ID
+     * @param spreadsheetToken 电子表格Token
+     * @param dataList 要写入的Map数据列表，每个Map的key为字段名，value为字段值
+     * @return MapWriteBuilder实例，支持链式调用
+     */
+    public static MapWriteBuilder writeMapBuilder(String sheetId, String spreadsheetToken,
+                                                  List<Map<String, Object>> dataList) {
+        return new MapWriteBuilder(sheetId, spreadsheetToken, dataList);
     }
 }
