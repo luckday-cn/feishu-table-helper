@@ -5,12 +5,10 @@ import cn.isliu.core.FileData;
 import cn.isliu.core.FsTableData;
 import cn.isliu.core.Sheet;
 import cn.isliu.core.annotation.TableConf;
-import cn.isliu.core.builder.MapWriteBuilder;
-import cn.isliu.core.builder.ReadBuilder;
-import cn.isliu.core.builder.SheetBuilder;
-import cn.isliu.core.builder.WriteBuilder;
+import cn.isliu.core.builder.*;
 import cn.isliu.core.client.FeishuClient;
 import cn.isliu.core.client.FsClient;
+import cn.isliu.core.config.MapSheetConfig;
 import cn.isliu.core.config.MapTableConfig;
 import cn.isliu.core.enums.ErrorCode;
 import cn.isliu.core.enums.FileType;
@@ -99,6 +97,86 @@ public class FsHelper {
      */
     public static <T> SheetBuilder<T> createBuilder(String sheetName, String spreadsheetToken, Class<T> clazz) {
         return new SheetBuilder<>(sheetName, spreadsheetToken, clazz);
+    }
+
+    /**
+     * 使用 Map 配置创建飞书表格
+     *
+     * 直接使用 Map 配置创建飞书表格，无需定义实体类和注解。
+     * 适用于动态字段、临时表格创建等场景。
+     *
+     * 使用示例：
+     * <pre>
+     * MapSheetConfig config = MapSheetConfig.sheetBuilder()
+     *     .titleRow(2)
+     *     .headLine(3)
+     *     .headStyle("#ffffff", "#000000")
+     *     .isText(true)
+     *     .enableDesc(true)
+     *     .addField(MapFieldDefinition.text("字段1", 0))
+     *     .addField(MapFieldDefinition.singleSelect("字段2", 1, "选项1", "选项2"))
+     *     .build();
+     *
+     * String sheetId = FsHelper.createMapSheet("表格名称", spreadsheetToken, config);
+     * </pre>
+     *
+     * @param sheetName 工作表名称
+     * @param spreadsheetToken 电子表格Token
+     * @param config 表格配置，包含字段定义、样式等信息
+     * @return 创建成功返回工作表ID
+     */
+    public static String createMapSheet(String sheetName, String spreadsheetToken, MapSheetConfig config) {
+        return new MapSheetBuilder(sheetName, spreadsheetToken)
+                .config(config)
+                .build();
+    }
+
+    /**
+     * 创建 Map 表格构建器
+     *
+     * 返回一个 Map 表格构建器实例，支持链式调用和灵活配置。
+     * 相比直接使用 createMapSheet 方法，构建器方式提供了更灵活的配置方式。
+     *
+     * 支持动态添加字段，包括：
+     * - addField(field) - 添加单个字段
+     * - addFields(fieldList) - 批量添加字段列表
+     * - addFields(field1, field2, ...) - 批量添加字段（可变参数）
+     * - fields(fieldList) - 直接设置所有字段（覆盖现有）
+     *
+     * 使用示例：
+     * <pre>
+     * // 动态添加字段
+     * List&lt;MapFieldDefinition&gt; dynamicFields = getDynamicFields();
+     *
+     * String sheetId = FsHelper.createMapSheetBuilder("表格名称", spreadsheetToken)
+     *     .titleRow(2)
+     *     .headLine(3)
+     *     .headStyle("#ffffff", "#000000")
+     *     .isText(true)
+     *     .addFields(dynamicFields)  // 批量添加
+     *     .build();
+     *
+     * // 或者使用可变参数
+     * String sheetId = FsHelper.createMapSheetBuilder("表格名称", spreadsheetToken)
+     *     .addFields(
+     *         MapFieldDefinition.text("字段1", 0),
+     *         MapFieldDefinition.singleSelect("字段2", 1, "选项1", "选项2")
+     *     )
+     *     .build();
+     *
+     * // 创建分组表格
+     * String sheetId = FsHelper.createMapSheetBuilder("分组表格", spreadsheetToken)
+     *     .addFields(dynamicFields)
+     *     .groupFields("分组A", "分组B")
+     *     .build();
+     * </pre>
+     *
+     * @param sheetName 工作表名称
+     * @param spreadsheetToken 电子表格Token
+     * @return MapSheetBuilder实例，支持链式调用
+     */
+    public static MapSheetBuilder createMapSheetBuilder(String sheetName, String spreadsheetToken) {
+        return new MapSheetBuilder(sheetName, spreadsheetToken);
     }
 
 
@@ -367,5 +445,84 @@ public class FsHelper {
     public static MapWriteBuilder writeMapBuilder(String sheetId, String spreadsheetToken,
                                                   List<Map<String, Object>> dataList) {
         return new MapWriteBuilder(sheetId, spreadsheetToken, dataList);
+    }
+
+    /**
+     * 从飞书表格读取数据并转换为 Map 格式
+     *
+     * 直接从飞书表格读取数据并转换为 Map 列表，无需定义实体类和注解。
+     * 适用于动态字段、临时数据读取等场景。
+     *
+     * 返回的Map中包含两个特殊字段：
+     * - _uniqueId: 根据唯一键计算的唯一标识
+     * - _rowNumber: 数据所在的行号（从1开始）
+     *
+     * 注意：
+     * - 如果某行数据的所有业务字段值都为null或空字符串，该行数据将被自动过滤，不会包含在返回结果中
+     *
+     * 使用示例：
+     * <pre>
+     * MapTableConfig config = MapTableConfig.builder()
+     *     .titleRow(2)
+     *     .headLine(3)
+     *     .addUniKeyName("字段名1")
+     *     .build();
+     *
+     * List&lt;Map&lt;String, Object&gt;&gt; dataList = FsHelper.readMap(sheetId, spreadsheetToken, config);
+     * for (Map&lt;String, Object&gt; data : dataList) {
+     *     String value1 = (String) data.get("字段名1");
+     *     String value2 = (String) data.get("字段名2");
+     *     String uniqueId = (String) data.get("_uniqueId");
+     *     Integer rowNumber = (Integer) data.get("_rowNumber");
+     * }
+     * </pre>
+     *
+     * @param sheetId 工作表ID
+     * @param spreadsheetToken 电子表格Token
+     * @param config 表格配置，包含标题行、数据起始行、唯一键等配置信息
+     * @return Map数据列表，每个Map的key为字段名，value为字段值
+     */
+    public static List<Map<String, Object>> readMap(String sheetId, String spreadsheetToken, MapTableConfig config) {
+        return new MapReadBuilder(sheetId, spreadsheetToken)
+                .config(config)
+                .build();
+    }
+
+    /**
+     * 创建 Map 数据读取构建器
+     *
+     * 返回一个 Map 数据读取构建器实例，支持链式调用和灵活配置。
+     * 相比直接使用 readMap 方法，构建器方式提供了更灵活的配置方式。
+     *
+     * 返回的Map中包含两个特殊字段：
+     * - _uniqueId: 根据唯一键计算的唯一标识
+     * - _rowNumber: 数据所在的行号（从1开始）
+     *
+     * 注意：
+     * - 如果某行数据的所有业务字段值都为null或空字符串，该行数据将被自动过滤，不会包含在返回结果中
+     * - 分组读取时，如果某个分组下的某行数据所有字段值都为null或空字符串，该行数据也会被自动过滤
+     *
+     * 使用示例：
+     * <pre>
+     * // 基础读取
+     * List&lt;Map&lt;String, Object&gt;&gt; dataList = FsHelper.readMapBuilder(sheetId, spreadsheetToken)
+     *     .titleRow(2)
+     *     .headLine(3)
+     *     .addUniKeyName("字段名1")
+     *     .build();
+     *
+     * // 分组读取
+     * Map&lt;String, List&lt;Map&lt;String, Object&gt;&gt;&gt; groupedData = FsHelper.readMapBuilder(sheetId, spreadsheetToken)
+     *     .titleRow(2)
+     *     .headLine(3)
+     *     .groupBuild();
+     * </pre>
+     *
+     * @param sheetId 工作表ID
+     * @param spreadsheetToken 电子表格Token
+     * @return MapReadBuilder实例，支持链式调用
+     */
+    public static MapReadBuilder readMapBuilder(String sheetId, String spreadsheetToken) {
+        return new MapReadBuilder(sheetId, spreadsheetToken);
     }
 }
