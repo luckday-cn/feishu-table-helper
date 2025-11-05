@@ -5,7 +5,9 @@ import cn.isliu.core.Reply;
 import cn.isliu.core.Sheet;
 import cn.isliu.core.SheetMeta;
 import cn.isliu.core.ValuesBatch;
+import cn.isliu.core.annotation.TableConf;
 import cn.isliu.core.client.FeishuClient;
+import cn.isliu.core.config.MapSheetConfig;
 import cn.isliu.core.exception.FsHelperException;
 import cn.isliu.core.logging.FsLogger;
 import cn.isliu.core.pojo.ApiResponse;
@@ -440,7 +442,16 @@ public class FsApiUtil {
         batchPutValuesBuilder.addRange(sheetId + "!A" + titleRow + ":" + position + titleRow);
         batchPutValuesBuilder.addRow(headers.toArray());
 
-        return FsApiUtil.putValues(spreadsheetToken, batchPutValuesBuilder.build(), client);
+        Object putValues = FsApiUtil.putValues(spreadsheetToken, batchPutValuesBuilder.build(), client);
+
+        String[] positionArr = {"A" + titleRow, position + titleRow};
+        MapSheetConfig config = MapSheetConfig.createDefault();
+
+        CustomCellService.StyleCellsBatchBuilder defaultTableStyle = FsTableUtil.getDefaultTableStyle(sheetId, positionArr,
+                config.getHeadBackColor(), config.getHeadFontColor());
+
+        FsApiUtil.setTableStyle(defaultTableStyle, client, spreadsheetToken);
+        return putValues;
     }
 
     /**

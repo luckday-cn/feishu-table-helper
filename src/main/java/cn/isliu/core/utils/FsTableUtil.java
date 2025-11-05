@@ -831,6 +831,16 @@ public class FsTableUtil {
         return styleCellsBatchBuilder;
     }
 
+    public static CustomCellService.StyleCellsBatchBuilder getDefaultTableStyle(String sheetId, String[] position,
+                  String backColor, String foreColor) {
+
+        CustomCellService.StyleCellsBatchBuilder styleCellsBatchBuilder = CustomCellService.CellRequest.styleCellsBatch()
+                .addRange(sheetId, position[0], position[1])
+                .backColor(backColor)
+                .foreColor(foreColor);
+        return styleCellsBatchBuilder;
+    }
+
     public static Map<String, String[]> calculateGroupPositions(List<String> headers, List<String> groupFields) {
         Map<String, String[]> positions = new HashMap<>();
         int index = 0;

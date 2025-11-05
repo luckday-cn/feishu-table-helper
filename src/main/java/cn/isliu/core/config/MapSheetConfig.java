@@ -21,12 +21,12 @@ public class MapSheetConfig extends MapTableConfig {
     /**
      * 表头字体颜色（十六进制，如 #ffffff）
      */
-    private String headFontColor = "#ffffff";
+    private String headFontColor = "#000000";
 
     /**
      * 表头背景颜色（十六进制，如 #000000）
      */
-    private String headBackColor = "#000000";
+    private String headBackColor = "#cccccc";
 
     /**
      * 是否将单元格设置为纯文本格式
