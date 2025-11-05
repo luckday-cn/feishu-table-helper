@@ -12,27 +12,27 @@ import java.util.*;
  * @since 2025-10-16
  */
 public class MapSheetConfig extends MapTableConfig {
-    
+
     /**
      * 字段定义列表
      */
     private List<MapFieldDefinition> fields = new ArrayList<>();
-    
+
     /**
      * 表头字体颜色（十六进制，如 #ffffff）
      */
     private String headFontColor = "#ffffff";
-    
+
     /**
      * 表头背景颜色（十六进制，如 #000000）
      */
     private String headBackColor = "#000000";
-    
+
     /**
      * 是否将单元格设置为纯文本格式
      */
     private boolean isText = false;
-    
+
     /**
      * 是否启用字段描述行
      */
@@ -98,12 +98,12 @@ public class MapSheetConfig extends MapTableConfig {
      * 分组字段列表（用于创建分组表格）
      */
     private List<String> groupFields = new ArrayList<>();
-    
+
     /**
      * 自定义属性映射（用于传递额外配置）
      */
     private Map<String, Object> customProperties = new HashMap<>();
-    
+
     /**
      * 创建默认配置
      *
@@ -112,7 +112,7 @@ public class MapSheetConfig extends MapTableConfig {
     public static MapSheetConfig createDefault() {
         return new MapSheetConfig();
     }
-    
+
     /**
      * 创建表格配置构建器
      *
@@ -121,7 +121,7 @@ public class MapSheetConfig extends MapTableConfig {
     public static SheetBuilder sheetBuilder() {
         return new SheetBuilder();
     }
-    
+
     /**
      * 添加单个字段
      *
@@ -132,7 +132,7 @@ public class MapSheetConfig extends MapTableConfig {
         this.fields.add(field);
         return this;
     }
-    
+
     /**
      * 批量添加字段
      *
@@ -143,7 +143,7 @@ public class MapSheetConfig extends MapTableConfig {
         this.fields.addAll(fields);
         return this;
     }
-    
+
     /**
      * 批量添加字段（可变参数）
      *
@@ -154,7 +154,7 @@ public class MapSheetConfig extends MapTableConfig {
         this.fields.addAll(Arrays.asList(fields));
         return this;
     }
-    
+
     /**
      * 添加分组字段
      *
@@ -165,7 +165,7 @@ public class MapSheetConfig extends MapTableConfig {
         this.groupFields.add(groupField);
         return this;
     }
-    
+
     /**
      * 添加自定义属性
      *
@@ -195,7 +195,7 @@ public class MapSheetConfig extends MapTableConfig {
      */
     public static class SheetBuilder {
         private final MapSheetConfig config = new MapSheetConfig();
-        
+
         /**
          * 设置标题行行号
          *
@@ -206,7 +206,7 @@ public class MapSheetConfig extends MapTableConfig {
             config.setTitleRow(titleRow);
             return this;
         }
-        
+
         /**
          * 设置数据起始行行号
          *
@@ -217,7 +217,7 @@ public class MapSheetConfig extends MapTableConfig {
             config.setHeadLine(headLine);
             return this;
         }
-        
+
         /**
          * 设置唯一键字段名集合
          *
@@ -228,7 +228,7 @@ public class MapSheetConfig extends MapTableConfig {
             config.setUniKeyNames(uniKeyNames);
             return this;
         }
-        
+
         /**
          * 添加唯一键字段名
          *
@@ -239,7 +239,7 @@ public class MapSheetConfig extends MapTableConfig {
             config.addUniKeyName(uniKeyName);
             return this;
         }
-        
+
         /**
          * 设置是否覆盖已存在数据
          *
@@ -250,7 +250,23 @@ public class MapSheetConfig extends MapTableConfig {
             config.setEnableCover(enableCover);
             return this;
         }
-        
+
+
+        /**
+         * 设置是否启用 Upsert 模式
+         *
+         * true（默认）：根据唯一键匹配，存在则更新，不存在则追加
+         * false：不匹配唯一键，所有数据直接追加到表格末尾
+         *
+         * @param upsert true 为 Upsert 模式，false 为纯追加模式
+         * @return SheetBuilder实例
+         */
+        public SheetBuilder upsert(boolean upsert) {
+            config.setUpsert(upsert);
+            return this;
+        }
+
+
         /**
          * 设置字段定义列表
          *
@@ -261,7 +277,7 @@ public class MapSheetConfig extends MapTableConfig {
             config.fields = new ArrayList<>(fields);
             return this;
         }
-        
+
         /**
          * 添加单个字段
          *
@@ -272,7 +288,7 @@ public class MapSheetConfig extends MapTableConfig {
             config.fields.add(field);
             return this;
         }
-        
+
         /**
          * 批量添加字段
          *
@@ -283,7 +299,7 @@ public class MapSheetConfig extends MapTableConfig {
             config.fields.addAll(fields);
             return this;
         }
-        
+
         /**
          * 批量添加字段（可变参数）
          *
@@ -294,7 +310,7 @@ public class MapSheetConfig extends MapTableConfig {
             config.fields.addAll(Arrays.asList(fields));
             return this;
         }
-        
+
         /**
          * 设置表头字体颜色
          *
@@ -305,7 +321,7 @@ public class MapSheetConfig extends MapTableConfig {
             config.headFontColor = headFontColor;
             return this;
         }
-        
+
         /**
          * 设置表头背景颜色
          *
@@ -316,7 +332,7 @@ public class MapSheetConfig extends MapTableConfig {
             config.headBackColor = headBackColor;
             return this;
         }
-        
+
         /**
          * 设置表头样式
          *
@@ -329,7 +345,7 @@ public class MapSheetConfig extends MapTableConfig {
             config.headBackColor = backColor;
             return this;
         }
-        
+
         /**
          * 设置是否将单元格设置为纯文本
          *
@@ -340,7 +356,7 @@ public class MapSheetConfig extends MapTableConfig {
             config.isText = isText;
             return this;
         }
-        
+
         /**
          * 设置是否启用字段描述行
          *
@@ -351,7 +367,7 @@ public class MapSheetConfig extends MapTableConfig {
             config.enableDesc = enableDesc;
             return this;
         }
-        
+
         /**
          * 设置分组字段列表
          *
@@ -362,7 +378,7 @@ public class MapSheetConfig extends MapTableConfig {
             config.groupFields = new ArrayList<>(groupFields);
             return this;
         }
-        
+
         /**
          * 设置分组字段（可变参数）
          *
@@ -373,7 +389,7 @@ public class MapSheetConfig extends MapTableConfig {
             config.groupFields = Arrays.asList(groupFields);
             return this;
         }
-        
+
         /**
          * 添加分组字段
          *
@@ -384,7 +400,7 @@ public class MapSheetConfig extends MapTableConfig {
             config.groupFields.add(groupField);
             return this;
         }
-        
+
         /**
          * 设置自定义属性映射
          *
@@ -395,7 +411,7 @@ public class MapSheetConfig extends MapTableConfig {
             config.customProperties = new HashMap<>(customProperties);
             return this;
         }
-        
+
         /**
          * 添加自定义属性
          *
@@ -407,7 +423,7 @@ public class MapSheetConfig extends MapTableConfig {
             config.customProperties.put(key, value);
             return this;
         }
-        
+
         /**
          * 构建配置对象
          *
@@ -418,7 +434,7 @@ public class MapSheetConfig extends MapTableConfig {
             if (config.fields.isEmpty()) {
                 throw new IllegalArgumentException("字段定义列表不能为空");
             }
-            
+
             return config;
         }
     }

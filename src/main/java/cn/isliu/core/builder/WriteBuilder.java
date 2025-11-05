@@ -32,6 +32,7 @@ public class WriteBuilder<T> {
     private Class<?> clazz;
     private boolean ignoreNotFound;
     private String groupField;
+    private Boolean upsert;
 
     /**
      * 构造函数
@@ -107,6 +108,22 @@ public class WriteBuilder<T> {
     }
 
     /**
+     * 设置是否启用 Upsert 模式
+     *
+     * 此方法设置的值会覆盖 @TableConf 注解中的配置。
+     *
+     * true（默认）：根据唯一键匹配，存在则更新，不存在则追加
+     * false：不匹配唯一键，所有数据直接追加到表格末尾
+     *
+     * @param upsert true 为 Upsert 模式，false 为纯追加模式
+     * @return WriteBuilder实例，支持链式调用
+     */
+    public WriteBuilder<T> upsert(boolean upsert) {
+        this.upsert = upsert;
+        return this;
+    }
+
+    /**
      * 执行数据写入并返回操作结果
      *
      * 根据配置的参数将数据写入到飞书表格中，支持新增和更新操作。
@@ -133,6 +150,10 @@ public class WriteBuilder<T> {
         Sheet sheet = FsApiUtil.getSheetMetadata(sheetId, client, spreadsheetToken);
 
         TableConf tableConf = aClass != null ? PropertyUtil.getTableConf(aClass) : PropertyUtil.getTableConf(sourceClass);
+
+        // 确定最终的 upsert 值：Builder 方法参数优先，否则使用注解配置
+        boolean finalUpsert = (this.upsert != null) ? this.upsert : tableConf.upsert();
+
         Map<String, String> titlePostionMap = FsTableUtil.getTitlePostionMap(sheet, spreadsheetToken, tableConf);
         Set<String> keys = titlePostionMap.keySet();
 
@@ -161,12 +182,18 @@ public class WriteBuilder<T> {
             }
         }
 
-        Map<String, Integer> currTableRowMap = fsTableDataList.stream()
-                .filter(fsTableData -> fsTableData.getRow() >= tableConf.headLine())
-                .collect(Collectors.toMap(
-                        FsTableData::getUniqueId,
-                        FsTableData::getRow,
-                        (existing, replacement) -> existing));
+        // 根据 finalUpsert 决定是否构建映射表
+        Map<String, Integer> currTableRowMap = new HashMap<>();
+        if (finalUpsert) {
+            // Upsert 模式：构建 uniqueId 到行号的映射表
+            currTableRowMap = fsTableDataList.stream()
+                    .filter(fsTableData -> fsTableData.getRow() >= tableConf.headLine())
+                    .collect(Collectors.toMap(
+                            FsTableData::getUniqueId,
+                            FsTableData::getRow,
+                            (existing, replacement) -> existing
+                    ));
+        }
 
         final Integer[] row = {tableConf.headLine()};
         fsTableDataList.forEach(fsTableData -> {
@@ -182,53 +209,75 @@ public class WriteBuilder<T> {
 
         AtomicInteger rowCount = new AtomicInteger(row[0]);
 
-        for (T data : dataList) {
-            Map<String, Object> values = GenerateUtil.getFieldValue(data, fieldMap);
+        if (finalUpsert) {
+            // Upsert 模式：计算 uniqueId 并匹配更新或追加
+            for (T data : dataList) {
+                Map<String, Object> values = GenerateUtil.getFieldValue(data, fieldMap);
 
-            // 计算唯一标识：如果data类型与aClass相同，使用忽略字段逻辑；否则直接从data获取uniqueId
-            String uniqueId;
-            if (data.getClass().equals(aClass)) {
-                // 类型相同，使用忽略字段逻辑计算唯一标识
-                uniqueId = calculateUniqueIdWithIgnoreFields(data, processedIgnoreFields, tableConf);
-            } else {
-                uniqueId = GenerateUtil.getUniqueId(data, tableConf);
+                // 计算唯一标识：如果data类型与aClass相同，使用忽略字段逻辑；否则直接从data获取uniqueId
+                String uniqueId;
+                if (data.getClass().equals(aClass)) {
+                    // 类型相同，使用忽略字段逻辑计算唯一标识
+                    uniqueId = calculateUniqueIdWithIgnoreFields(data, processedIgnoreFields, tableConf);
+                } else {
+                    uniqueId = GenerateUtil.getUniqueId(data, tableConf);
+                }
+
+                AtomicReference<Integer> rowNum = new AtomicReference<>(currTableRowMap.get(uniqueId));
+                if (uniqueId != null && rowNum.get() != null) {
+                    // 找到匹配的行 → 更新
+                    rowNum.set(rowNum.get() + 1);
+                    Map<String, String> finalTitlePostionMap = titlePostionMap;
+                    values.forEach((field, fieldValue) -> {
+                        String position = finalTitlePostionMap.get(field);
+
+                        if (fieldValue instanceof FileData) {
+                            FileData fileData = (FileData) fieldValue;
+                            String fileType = fileData.getFileType();
+                            if (fileType.equals(FileType.IMAGE.getType())) {
+                                fileData.setSheetId(sheetId);
+                                fileData.setSpreadsheetToken(spreadsheetToken);
+                                fileData.setPosition(position + rowNum.get());
+                                fileDataList.add(fileData);
+                            }
+                        }
+                        if (tableConf.enableCover() || fieldValue != null) {
+                            resultValuesBuilder.addRange(sheetId, position + rowNum.get(), position + rowNum.get())
+                                    .addRow(GenerateUtil.getRowData(fieldValue));
+                        }
+                    });
+                } else if (!ignoreNotFound) {
+                    // 未找到 && ignoreNotFound = false → 追加
+                    int rowCou = rowCount.incrementAndGet();
+                    Map<String, String> finalTitlePostionMap1 = titlePostionMap;
+                    values.forEach((field, fieldValue) -> {
+
+                        String position = finalTitlePostionMap1.get(field);
+                        if (fieldValue instanceof FileData) {
+                            FileData fileData = (FileData) fieldValue;
+                            fileData.setSheetId(sheetId);
+                            fileData.setSpreadsheetToken(spreadsheetToken);
+                            fileData.setPosition(position + rowCou);
+                            fileDataList.add(fileData);
+                        }
+
+                        if (tableConf.enableCover() || fieldValue != null) {
+                            resultValuesBuilder.addRange(sheetId, position + rowCou, position + rowCou)
+                                    .addRow(GenerateUtil.getRowData(fieldValue));
+                        }
+                    });
+                }
+                // else: 未找到 && ignoreNotFound = true → 跳过该数据
             }
+        } else {
+            // 纯追加模式：不计算 uniqueId，所有数据直接追加到表格末尾
+            for (T data : dataList) {
+                Map<String, Object> values = GenerateUtil.getFieldValue(data, fieldMap);
 
-            AtomicReference<Integer> rowNum = new AtomicReference<>(currTableRowMap.get(uniqueId));
-            if (uniqueId != null && rowNum.get() != null) {
-                rowNum.set(rowNum.get() + 1);
+                int rowCou = rowCount.incrementAndGet();
                 Map<String, String> finalTitlePostionMap = titlePostionMap;
                 values.forEach((field, fieldValue) -> {
                     String position = finalTitlePostionMap.get(field);
-
-                    if (position == null || position.isEmpty()) {
-                        return;
-                    }
-
-                    if (fieldValue instanceof FileData) {
-                        FileData fileData = (FileData) fieldValue;
-                        String fileType = fileData.getFileType();
-                        if (fileType.equals(FileType.IMAGE.getType())) {
-                            fileData.setSheetId(sheetId);
-                            fileData.setSpreadsheetToken(spreadsheetToken);
-                            fileData.setPosition(position + rowNum.get());
-                            fileDataList.add(fileData);
-                        }
-                    }
-                    if (tableConf.enableCover() || fieldValue != null) {
-                        resultValuesBuilder.addRange(sheetId, position + rowNum.get(), position + rowNum.get())
-                                .addRow(GenerateUtil.getRowData(fieldValue));
-                    }
-                });
-            } else if (!ignoreNotFound) {
-                int rowCou = rowCount.incrementAndGet();
-                Map<String, String> finalTitlePostionMap1 = titlePostionMap;
-                values.forEach((field, fieldValue) -> {
-                    String position = finalTitlePostionMap1.get(field);
-
-                    if (position == null || position.isEmpty()) {
-                        return;
-                    }
 
                     if (fieldValue instanceof FileData) {
                         FileData fileData = (FileData) fieldValue;

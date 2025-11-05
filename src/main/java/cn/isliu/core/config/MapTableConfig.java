@@ -14,37 +14,44 @@ import java.util.Set;
  * @since 2025-10-16
  */
 public class MapTableConfig {
-    
+
     /**
      * 标题行行号（从1开始）
      */
     private int titleRow = 1;
-    
+
     /**
      * 数据起始行行号（从1开始）
      */
     private int headLine = 1;
-    
+
     /**
      * 唯一键字段名列表
      */
     private Set<String> uniKeyNames = new HashSet<>();
-    
+
     /**
      * 是否覆盖已存在数据
      */
     private boolean enableCover = false;
-    
+
     /**
      * 是否忽略未找到的数据
      */
     private boolean ignoreNotFound = false;
-    
+
+    /**
+     * 是否启用 Upsert 模式
+     * true（默认）：根据唯一键匹配，存在则更新，不存在则追加
+     * false：不匹配唯一键，所有数据直接追加到表格末尾
+     */
+    private boolean upsert = true;
+
     /**
      * 字段位置映射 (字段名 -> 列位置，如 "添加SPU" -> "A")
      */
     private Map<String, String> fieldsPositionMap = new HashMap<>();
-    
+
     /**
      * 获取标题行行号
      *
@@ -53,7 +60,7 @@ public class MapTableConfig {
     public int getTitleRow() {
         return titleRow;
     }
-    
+
     /**
      * 设置标题行行号
      *
@@ -64,7 +71,7 @@ public class MapTableConfig {
         this.titleRow = titleRow;
         return this;
     }
-    
+
     /**
      * 获取数据起始行行号
      *
@@ -73,7 +80,7 @@ public class MapTableConfig {
     public int getHeadLine() {
         return headLine;
     }
-    
+
     /**
      * 设置数据起始行行号
      *
@@ -84,7 +91,7 @@ public class MapTableConfig {
         this.headLine = headLine;
         return this;
     }
-    
+
     /**
      * 获取唯一键字段名集合
      *
@@ -93,7 +100,7 @@ public class MapTableConfig {
     public Set<String> getUniKeyNames() {
         return uniKeyNames;
     }
-    
+
     /**
      * 设置唯一键字段名集合
      *
@@ -104,7 +111,7 @@ public class MapTableConfig {
         this.uniKeyNames = uniKeyNames;
         return this;
     }
-    
+
     /**
      * 添加唯一键字段名
      *
@@ -115,7 +122,7 @@ public class MapTableConfig {
         this.uniKeyNames.add(uniKeyName);
         return this;
     }
-    
+
     /**
      * 是否覆盖已存在数据
      *
@@ -124,7 +131,7 @@ public class MapTableConfig {
     public boolean isEnableCover() {
         return enableCover;
     }
-    
+
     /**
      * 设置是否覆盖已存在数据
      *
@@ -135,7 +142,7 @@ public class MapTableConfig {
         this.enableCover = enableCover;
         return this;
     }
-    
+
     /**
      * 是否忽略未找到的数据
      *
@@ -144,7 +151,7 @@ public class MapTableConfig {
     public boolean isIgnoreNotFound() {
         return ignoreNotFound;
     }
-    
+
     /**
      * 设置是否忽略未找到的数据
      *
@@ -155,7 +162,31 @@ public class MapTableConfig {
         this.ignoreNotFound = ignoreNotFound;
         return this;
     }
-    
+
+
+    /**
+     * 是否启用 Upsert 模式
+     *
+     * @return true 为 Upsert 模式，false 为纯追加模式
+     */
+    public boolean isUpsert() {
+        return upsert;
+    }
+
+    /**
+     * 设置是否启用 Upsert 模式
+     *
+     * true（默认）：根据唯一键匹配，存在则更新，不存在则追加
+     * false：不匹配唯一键，所有数据直接追加到表格末尾
+     *
+     * @param upsert true 为 Upsert 模式，false 为纯追加模式
+     * @return MapTableConfig实例，支持链式调用
+     */
+    public MapTableConfig setUpsert(boolean upsert) {
+        this.upsert = upsert;
+        return this;
+    }
+
     /**
      * 获取字段位置映射
      *
@@ -164,7 +195,7 @@ public class MapTableConfig {
     public Map<String, String> getFieldsPositionMap() {
         return fieldsPositionMap;
     }
-    
+
     /**
      * 设置字段位置映射
      *
@@ -175,7 +206,7 @@ public class MapTableConfig {
         this.fieldsPositionMap = fieldsPositionMap;
         return this;
     }
-    
+
     /**
      * 创建默认配置
      *
@@ -184,7 +215,7 @@ public class MapTableConfig {
     public static MapTableConfig createDefault() {
         return new MapTableConfig();
     }
-    
+
     /**
      * 创建配置构建器
      *
@@ -193,13 +224,13 @@ public class MapTableConfig {
     public static Builder builder() {
         return new Builder();
     }
-    
+
     /**
      * 配置构建器
      */
     public static class Builder {
         private final MapTableConfig config = new MapTableConfig();
-        
+
         /**
          * 设置标题行行号
          *
@@ -210,7 +241,7 @@ public class MapTableConfig {
             config.titleRow = titleRow;
             return this;
         }
-        
+
         /**
          * 设置数据起始行行号
          *
@@ -221,7 +252,7 @@ public class MapTableConfig {
             config.headLine = headLine;
             return this;
         }
-        
+
         /**
          * 设置唯一键字段名集合
          *
@@ -232,7 +263,7 @@ public class MapTableConfig {
             config.uniKeyNames = new HashSet<>(uniKeyNames);
             return this;
         }
-        
+
         /**
          * 添加唯一键字段名
          *
@@ -243,7 +274,7 @@ public class MapTableConfig {
             config.uniKeyNames.add(uniKeyName);
             return this;
         }
-        
+
         /**
          * 设置是否覆盖已存在数据
          *
@@ -254,7 +285,7 @@ public class MapTableConfig {
             config.enableCover = enableCover;
             return this;
         }
-        
+
         /**
          * 设置是否忽略未找到的数据
          *
@@ -265,7 +296,21 @@ public class MapTableConfig {
             config.ignoreNotFound = ignoreNotFound;
             return this;
         }
-        
+
+        /**
+         * 设置是否启用 Upsert 模式
+         *
+         * true（默认）：根据唯一键匹配，存在则更新，不存在则追加
+         * false：不匹配唯一键，所有数据直接追加到表格末尾
+         *
+         * @param upsert true 为 Upsert 模式，false 为纯追加模式
+         * @return Builder实例
+         */
+        public Builder upsert(boolean upsert) {
+            config.upsert = upsert;
+            return this;
+        }
+
         /**
          * 设置字段位置映射
          *
@@ -276,7 +321,7 @@ public class MapTableConfig {
             config.fieldsPositionMap = new HashMap<>(fieldsPositionMap);
             return this;
         }
-        
+
         /**
          * 构建配置对象
          *

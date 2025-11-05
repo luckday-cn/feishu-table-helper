@@ -65,4 +65,15 @@ public @interface TableConf {
      * @return 背景颜色
      */
     String headBackColor() default "#cccccc";
+
+
+    /**
+     * 是否启用 Upsert 模式
+     *
+     * true（默认）：根据唯一键匹配，存在则更新，不存在则追加
+     * false：不匹配唯一键，所有数据直接追加到表格末尾
+     *
+     * @return 是否启用 Upsert 模式
+     */
+    boolean upsert() default true;
 }

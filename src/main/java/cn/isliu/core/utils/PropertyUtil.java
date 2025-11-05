@@ -484,6 +484,12 @@ public class PropertyUtil {
                 public String headBackColor() {
                     return "#cccccc";
                 }
+
+
+                @Override
+                public boolean upsert() {
+                    return true;
+                }
             };
         }
         return tableConf;
