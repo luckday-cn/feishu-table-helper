@@ -430,6 +430,26 @@ public class FsApiUtil {
         return tmpUrl;
     }
 
+    /**
+     * 写入表头
+     */
+    public static Object writeTableHeaders(String sheetId, String spreadsheetToken, List<String> headers, int titleRow, FeishuClient client) {
+        CustomValueService.ValueRequest.BatchPutValuesBuilder batchPutValuesBuilder = CustomValueService.ValueRequest.batchPutValues();
+
+        String position = FsTableUtil.getColumnNameByNuNumber(headers.size());
+        batchPutValuesBuilder.addRange(sheetId + "!A" + titleRow + ":" + position + titleRow);
+        batchPutValuesBuilder.addRow(headers.toArray());
+
+        return FsApiUtil.putValues(spreadsheetToken, batchPutValuesBuilder.build(), client);
+    }
+
+    /**
+     * 写入表头
+     */
+    public static Object writeTableHeaders(String sheetId, String spreadsheetToken, List<String> headers, FeishuClient client) {
+         return writeTableHeaders(sheetId, spreadsheetToken, headers, 1, client);
+    }
+
     public static Object putValues(String spreadsheetToken, CustomValueService.ValueRequest putValuesBuilder, FeishuClient client) {
         FsLogger.debug("【飞书表格】 putValues 开始写入数据！参数：{}", gson.toJson(putValuesBuilder));
 
