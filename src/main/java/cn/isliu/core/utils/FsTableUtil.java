@@ -186,7 +186,7 @@ public class FsTableUtil {
         List<List<Object>> values = new LinkedList<>();
         for (int i = 0; i < batchCount; i++) {
             int startRowIndex = startOffset + i * rowCount;
-            int endRowIndex = Math.max(startRowIndex + rowCount - 1, totalRow - 1);
+            int endRowIndex = Math.min(startRowIndex + rowCount - 1, totalRow - 1);
 
             // 3. 获取工作表数据
             ValuesBatch valuesBatch = FsApiUtil.getSheetData(sheet.getSheetId(), spreadsheetToken,
@@ -498,6 +498,9 @@ public class FsTableUtil {
 
     public static void setTableOptions(String spreadsheetToken, List<String> headers, Map<String, FieldProperty> fieldsMap,
                                        String sheetId, boolean enableDesc, Map<String, Object> customProperties) {
+        // 读取sheet数据，查询有现有行数（超出会报错）
+        Sheet sheet = FsApiUtil.getSheetMetadata(sheetId, FsClient.getInstance().getClient(), spreadsheetToken);
+        int rowCount = sheet.getGridProperties().getRowCount();
 
         List<Object> list = Arrays.asList(headers.toArray());
         int line = getMaxLevel(fieldsMap) + (enableDesc ? 2 : 1);
@@ -534,8 +537,9 @@ public class FsTableUtil {
                     }
 
                     if (result != null && !result.isEmpty()) {
-                        FsApiUtil.setOptions(sheetId, FsClient.getInstance().getClient(), spreadsheetToken, tableProperty.type() == TypeEnum.MULTI_SELECT, position + line, position + 200,
-                                result);
+                        FsApiUtil.setOptions(sheetId, FsClient.getInstance().getClient(), spreadsheetToken,
+                                tableProperty.type() == TypeEnum.MULTI_SELECT,
+                                position + line, position + rowCount, result);
                     }
                 }
             }

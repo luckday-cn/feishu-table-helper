@@ -260,7 +260,12 @@ public class FsHelper {
         FeishuClient client = FsClient.getInstance().getClient();
         Sheet sheet = FsApiUtil.getSheetMetadata(sheetId, client, spreadsheetToken);
         List<FsTableData> fsTableDataList = FsTableUtil.getFsTableData(sheet, spreadsheetToken, tableConf, fieldsMap);
-        Map<String, Integer> currTableRowMap = fsTableDataList.stream().collect(Collectors.toMap(FsTableData::getUniqueId, FsTableData::getRow));
+
+        Map<String, Integer> currTableRowMap = fsTableDataList.stream()
+                .collect(Collectors.toMap(
+                        FsTableData::getUniqueId,
+                        FsTableData::getRow,
+                        (existing, replacement) -> existing));
 
         final Integer[] row = {tableConf.headLine()};
         fsTableDataList.forEach(fsTableData -> {
@@ -345,7 +350,7 @@ public class FsHelper {
         int rowTotal = sheet.getGridProperties().getRowCount();
         int rowNum = rowCount.get();
         if (rowNum >= rowTotal) {
-            FsApiUtil.addRowColumns(sheetId, spreadsheetToken, "ROWS", rowTotal - rowNum, client);
+            FsApiUtil.addRowColumns(sheetId, spreadsheetToken, "ROWS", Math.abs(rowTotal - rowNum), client);
         }
 
         Object resp = FsApiUtil.batchPutValues(sheetId, spreadsheetToken, resultValuesBuilder.build(), client);

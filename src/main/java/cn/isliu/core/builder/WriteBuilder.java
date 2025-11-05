@@ -163,7 +163,10 @@ public class WriteBuilder<T> {
 
         Map<String, Integer> currTableRowMap = fsTableDataList.stream()
                 .filter(fsTableData -> fsTableData.getRow() >= tableConf.headLine())
-                .collect(Collectors.toMap(FsTableData::getUniqueId, FsTableData::getRow));
+                .collect(Collectors.toMap(
+                        FsTableData::getUniqueId,
+                        FsTableData::getRow,
+                        (existing, replacement) -> existing));
 
         final Integer[] row = {tableConf.headLine()};
         fsTableDataList.forEach(fsTableData -> {
@@ -246,7 +249,7 @@ public class WriteBuilder<T> {
         int rowTotal = sheet.getGridProperties().getRowCount();
         int rowNum = rowCount.get();
         if (rowNum >= rowTotal) {
-            FsApiUtil.addRowColumns(sheetId, spreadsheetToken, "ROWS", rowTotal - rowNum, client);
+            FsApiUtil.addRowColumns(sheetId, spreadsheetToken, "ROWS", Math.abs(rowTotal - rowNum), client);
         }
 
         fileDataList.forEach(fileData -> {
