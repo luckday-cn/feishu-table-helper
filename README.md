@@ -121,6 +121,7 @@ employees.forEach(emp -> System.out.println(emp.name + " - " + emp.email));
 - `headFontColor()`: 表头字体颜色
 - `headBackColor()`: 表头背景颜色
 - `enableDesc()`: 是否开启字段描述
+- `upsert()`: 是否启用 Upsert 模式
 
 ## 依赖
 
