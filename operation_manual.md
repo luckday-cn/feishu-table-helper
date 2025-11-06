@@ -42,7 +42,7 @@
 
 ### 1.4 版本信息
 
-- **当前版本**：0.0.5
+- **当前版本**：0.0.6
 - **最低 Java 版本**：Java 8
 - **主要依赖**：
   - 飞书开放平台 SDK (oapi-sdk) v2.4.21
@@ -61,14 +61,14 @@
 <dependency>
     <groupId>cn.isliu</groupId>
     <artifactId>feishu-table-helper</artifactId>
-    <version>0.0.5</version>
+    <version>0.0.6</version>
 </dependency>
 ```
 
 #### Gradle 依赖
 
 ```gradle
-implementation 'cn.isliu:feishu-table-helper:0.0.5'
+implementation 'cn.isliu:feishu-table-helper:0.0.6'
 ```
 
 ### 2.2 初始化配置
@@ -2644,7 +2644,7 @@ private String status;
 
 ### A. 版本更新日志
 
-#### v0.0.5
+#### v0.0.6
 - 支持 Map 配置方式创建和操作表格
 - 支持分组表格创建和读取
 - 优化多层级表头合并逻辑
