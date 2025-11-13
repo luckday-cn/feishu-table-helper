@@ -4,11 +4,13 @@ import com.lark.oapi.Client;
 import com.lark.oapi.core.enums.AppType;
 import com.lark.oapi.service.drive.DriveService;
 import com.lark.oapi.service.sheets.SheetsService;
-import okhttp3.ConnectionPool;
 import okhttp3.OkHttpClient;
 
 import java.util.concurrent.TimeUnit;
 
+import cn.isliu.core.ratelimit.DocumentLockRegistry;
+import cn.isliu.core.ratelimit.FeishuApiExecutor;
+import cn.isliu.core.ratelimit.FeishuRateLimiterManager;
 import cn.isliu.core.service.*;
 
 /**
@@ -23,6 +25,9 @@ public class FeishuClient {
     private final String appId;
     private final String appSecret;
     private final boolean closeOfficialPool;
+    private final FeishuRateLimiterManager rateLimiterManager;
+    private final DocumentLockRegistry documentLockRegistry;
+    private final FeishuApiExecutor apiExecutor;
 
     // 自定义服务，处理官方SDK未覆盖的API
     private volatile CustomSheetService customSheetService;
@@ -34,11 +39,7 @@ public class FeishuClient {
     private volatile CustomFileService customFileService;
 
     private FeishuClient(String appId, String appSecret, Client officialClient, OkHttpClient httpClient) {
-        this.appId = appId;
-        this.appSecret = appSecret;
-        this.officialClient = officialClient;
-        this.httpClient = httpClient;
-        this.closeOfficialPool = false;
+        this(appId, appSecret, officialClient, httpClient, false);
     }
 
     private FeishuClient(String appId, String appSecret, Client officialClient, OkHttpClient httpClient, boolean closeOfficialPool) {
@@ -47,6 +48,9 @@ public class FeishuClient {
         this.officialClient = officialClient;
         this.httpClient = httpClient;
         this.closeOfficialPool = closeOfficialPool;
+        this.rateLimiterManager = new FeishuRateLimiterManager();
+        this.documentLockRegistry = new DocumentLockRegistry();
+        this.apiExecutor = new FeishuApiExecutor(rateLimiterManager, documentLockRegistry);
     }
 
 
@@ -234,6 +238,18 @@ public class FeishuClient {
      */
     public boolean getCloseOfficialPool() {
         return closeOfficialPool;
+    }
+
+    public FeishuApiExecutor apiExecutor() {
+        return apiExecutor;
+    }
+
+    public FeishuRateLimiterManager rateLimiterManager() {
+        return rateLimiterManager;
+    }
+
+    public DocumentLockRegistry documentLockRegistry() {
+        return documentLockRegistry;
     }
 
     /**

@@ -12,6 +12,8 @@ import cn.isliu.core.exception.FsHelperException;
 import cn.isliu.core.logging.FsLogger;
 import cn.isliu.core.pojo.ApiResponse;
 import cn.isliu.core.pojo.RootFolderMetaResponse;
+import cn.isliu.core.ratelimit.ApiOperation;
+import cn.isliu.core.ratelimit.FeishuApiExecutor;
 import cn.isliu.core.service.*;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
@@ -41,6 +43,13 @@ public class FsApiUtil {
             put("Connection", Collections.singletonList("close"));
         }
     };
+
+    private static <T> T executeOfficial(FeishuClient client,
+                                         ApiOperation operation,
+                                         String spreadsheetToken,
+                                         FeishuApiExecutor.CheckedCallable<T> action) throws Exception {
+        return client.apiExecutor().execute(client.getAppId(), operation, spreadsheetToken, action);
+    }
 
     /**
      * 获取工作表数据
@@ -94,32 +103,37 @@ public class FsApiUtil {
      */
     public static Sheet getSheetMetadata(String sheetId, FeishuClient client, String spreadsheetToken) {
         try {
-            QuerySpreadsheetSheetReq req = QuerySpreadsheetSheetReq.newBuilder()
-                    .spreadsheetToken(spreadsheetToken)
-                    .build();
+            return executeOfficial(client, ApiOperation.GET_SPREADSHEET, spreadsheetToken, () -> {
+                QuerySpreadsheetSheetReq req = QuerySpreadsheetSheetReq.newBuilder()
+                        .spreadsheetToken(spreadsheetToken)
+                        .build();
 
-            QuerySpreadsheetSheetResp resp = client.sheets().v3().spreadsheetSheet().query(req, client.getCloseOfficialPool()
-                    ? RequestOptions.newBuilder().headers(m).build() : null);
+                QuerySpreadsheetSheetResp resp = client.sheets().v3().spreadsheetSheet().query(req, client.getCloseOfficialPool()
+                        ? RequestOptions.newBuilder().headers(m).build() : null);
 
-            // 处理服务端错误
-            if (resp.success()) {
-                // 修复参数转换遗漏问题 - 直接使用添加了注解的类进行转换
-                SheetMeta sheetMeta = gson.fromJson(gson.toJson(resp.getData()), SheetMeta.class);
-                List<Sheet> sheets = sheetMeta.getSheets();
+                if (resp.success()) {
+                    SheetMeta sheetMeta = gson.fromJson(gson.toJson(resp.getData()), SheetMeta.class);
+                    List<Sheet> sheets = sheetMeta.getSheets();
+                    AtomicReference<Sheet> sheet = new AtomicReference<>();
+                    sheets.forEach(s -> {
+                        if (s.getSheetId().equals(sheetId)) {
+                            sheet.set(s);
+                        }
+                    });
+                    return sheet.get();
+                }
 
-                AtomicReference<Sheet> sheet = new AtomicReference<>();
-                sheets.forEach(s -> {
-                    if (s.getSheetId().equals(sheetId)) {
-                        sheet.set(s);
-                    }
-                });
-
-                return sheet.get();
-            } else {
+                if (resp.getCode() == 99991400) {
+                    throw FsHelperException.builder(ErrorCode.API_CALL_FAILED)
+                            .message("【飞书表格】 获取Sheet元数据触发频控限制")
+                            .context("httpStatus", 429)
+                            .build();
+                }
                 FsLogger.error(ErrorCode.API_CALL_FAILED, "【飞书表格】 获取Sheet元数据异常！错误信息：" + gson.toJson(resp));
                 throw new FsHelperException("【飞书表格】 获取Sheet元数据异常！错误信息：" + resp.getMsg());
-            }
-
+            });
+        } catch (FsHelperException ex) {
+            throw ex;
         } catch (Exception e) {
             FsLogger.error(ErrorCode.API_CALL_FAILED, "【飞书表格】 获取Sheet元数据异常！错误信息：" + e.getMessage(), "getSheetMeta", e);
             throw new FsHelperException("【飞书表格】 获取Sheet元数据异常！");
@@ -194,24 +208,32 @@ public class FsApiUtil {
 
     public static CreateFolderFileRespBody createFolder(String folderName, String folderToken, FeishuClient client) {
         try {
-            // 创建请求对象
-            CreateFolderFileReq req = CreateFolderFileReq.newBuilder()
-                    .createFolderFileReqBody(CreateFolderFileReqBody.newBuilder()
-                            .name(folderName)
-                            .folderToken(folderToken)
-                            .build())
-                    .build();
+            return executeOfficial(client, ApiOperation.GENERIC_OPERATION, null, () -> {
+                CreateFolderFileReq req = CreateFolderFileReq.newBuilder()
+                        .createFolderFileReqBody(CreateFolderFileReqBody.newBuilder()
+                                .name(folderName)
+                                .folderToken(folderToken)
+                                .build())
+                        .build();
 
-            // 发起请求
-            CreateFolderFileResp resp = client.drive().v1().file().createFolder(req, client.getCloseOfficialPool()
-                    ? RequestOptions.newBuilder().headers(m).build() : null);
-            if (resp.success()) {
-                FsLogger.info("【飞书表格】 创建文件夹成功！ {}", gson.toJson(resp));
-                return resp.getData();
-            } else {
+                CreateFolderFileResp resp = client.drive().v1().file().createFolder(req, client.getCloseOfficialPool()
+                        ? RequestOptions.newBuilder().headers(m).build() : null);
+                if (resp.success()) {
+                    FsLogger.info("【飞书表格】 创建文件夹成功！ {}", gson.toJson(resp));
+                    return resp.getData();
+                }
+
+                if (resp.getCode() == 99991400) {
+                    throw FsHelperException.builder(ErrorCode.API_CALL_FAILED)
+                            .message("【飞书表格】 创建文件夹触发频控限制")
+                            .context("httpStatus", 429)
+                            .build();
+                }
                 FsLogger.warn("【飞书表格】 创建文件夹失败！参数：{}，错误信息：{}", String.format("folderName: %s, folderToken: %s", folderName, folderToken), resp.getMsg());
                 throw new FsHelperException("【飞书表格】 创建文件夹失败！");
-            }
+            });
+        } catch (FsHelperException ex) {
+            throw ex;
         } catch (Exception e) {
             FsLogger.warn("【飞书表格】 创建文件夹异常！参数：{}，错误信息：{}", String.format("folderName: %s, folderToken: %s", folderName, folderToken), e.getMessage(), e);
             throw new FsHelperException("【飞书表格】 创建文件夹异常！");
@@ -220,22 +242,33 @@ public class FsApiUtil {
 
     public static CreateSpreadsheetRespBody createTable(String tableName, String folderToken, FeishuClient client) {
         try {
-            CreateSpreadsheetReq req = CreateSpreadsheetReq.newBuilder()
-                    .spreadsheet(Spreadsheet.newBuilder()
-                            .title(tableName)
-                            .folderToken(folderToken)
-                            .build())
-                    .build();
+            return executeOfficial(client, ApiOperation.CREATE_SPREADSHEET, null, () -> {
+                CreateSpreadsheetReq req = CreateSpreadsheetReq.newBuilder()
+                        .spreadsheet(Spreadsheet.newBuilder()
+                                .title(tableName)
+                                .folderToken(folderToken)
+                                .build())
+                        .build();
 
-            CreateSpreadsheetResp resp = client.sheets().v3().spreadsheet().create(req, client.getCloseOfficialPool()
-                    ? RequestOptions.newBuilder().headers(m).build() : null);
-            if (resp.success()) {
-                FsLogger.info("【飞书表格】 创建表格成功！ {}", gson.toJson(resp));
-                return resp.getData();
-            } else {
+                CreateSpreadsheetResp resp = client.sheets().v3().spreadsheet().create(req, client.getCloseOfficialPool()
+                        ? RequestOptions.newBuilder().headers(m).build() : null);
+
+                if (resp.success()) {
+                    FsLogger.info("【飞书表格】 创建表格成功！ {}", gson.toJson(resp));
+                    return resp.getData();
+                }
+
+                if (resp.getCode() == 99991400) {
+                    throw FsHelperException.builder(ErrorCode.API_CALL_FAILED)
+                            .message("【飞书表格】 创建表格触发频控限制")
+                            .context("httpStatus", 429)
+                            .build();
+                }
                 FsLogger.warn("【飞书表格】 创建表格失败！错误信息：{}", gson.toJson(resp));
                 throw new FsHelperException("【飞书表格】 创建表格异常！");
-            }
+            });
+        } catch (FsHelperException ex) {
+            throw ex;
         } catch (Exception e) {
             FsLogger.warn("【飞书表格】 创建表格异常！参数：{}，错误信息：{}", String.format("tableName:%s, folderToken:%s", tableName, folderToken), e.getMessage(), e);
             throw new FsHelperException("【飞书表格】 创建表格异常！");
@@ -391,20 +424,30 @@ public class FsApiUtil {
      */
     public static void downloadMaterial(String fileToken, String outputPath, FeishuClient client, String extra) {
         try {
-            DownloadMediaReq req = DownloadMediaReq.newBuilder()
-                    .fileToken(fileToken)
-//                    .extra("无")
-                    .build();
+            executeOfficial(client, ApiOperation.GENERIC_OPERATION, null, () -> {
+                DownloadMediaReq req = DownloadMediaReq.newBuilder()
+                        .fileToken(fileToken)
+                        .build();
 
-            // 发起请求
-            DownloadMediaResp resp = client.drive().v1().media().download(req, client.getCloseOfficialPool()
-                    ? RequestOptions.newBuilder().headers(m).build() : null);
+                DownloadMediaResp resp = client.drive().v1().media().download(req, client.getCloseOfficialPool()
+                        ? RequestOptions.newBuilder().headers(m).build() : null);
 
-            // 处理服务端错误
-            if (resp.success()) {
+                if (!resp.success()) {
+                    if (resp.getCode() == 99991400) {
+                        throw FsHelperException.builder(ErrorCode.API_CALL_FAILED)
+                                .message("【飞书表格】 下载素材触发频控限制")
+                                .context("httpStatus", 429)
+                                .build();
+                    }
+                    FsLogger.warn("【飞书表格】 下载素材失败！参数：{}，错误信息：{}", fileToken, gson.toJson(resp));
+                    throw new FsHelperException("【飞书表格】 下载素材失败！");
+                }
+
                 resp.writeFile(outputPath);
-            }
-
+                return null;
+            });
+        } catch (FsHelperException ex) {
+            throw ex;
         } catch (Exception e) {
             FsLogger.warn("【飞书表格】 下载素材异常！参数：{}，错误信息：{}", fileToken, e.getMessage());
             throw new FsHelperException("【飞书表格】 下载素材异常！");
@@ -414,18 +457,27 @@ public class FsApiUtil {
     public static String downloadTmpMaterialUrl(String fileToken,  FeishuClient client) {
         String tmpUrl = "";
         try {
-            BatchGetTmpDownloadUrlMediaReq req = BatchGetTmpDownloadUrlMediaReq.newBuilder()
-                    .fileTokens(new String[]{fileToken})
-                    .build();
+            return executeOfficial(client, ApiOperation.GENERIC_OPERATION, null, () -> {
+                BatchGetTmpDownloadUrlMediaReq req = BatchGetTmpDownloadUrlMediaReq.newBuilder()
+                        .fileTokens(new String[]{fileToken})
+                        .build();
 
-            BatchGetTmpDownloadUrlMediaResp resp = client.drive().v1().media().batchGetTmpDownloadUrl(req, client.getCloseOfficialPool()
-                    ? RequestOptions.newBuilder().headers(m).build() : null);
+                BatchGetTmpDownloadUrlMediaResp resp = client.drive().v1().media().batchGetTmpDownloadUrl(req, client.getCloseOfficialPool()
+                        ? RequestOptions.newBuilder().headers(m).build() : null);
 
-            if (resp.success()) {
-                return resp.getData().getTmpDownloadUrls()[0].getTmpDownloadUrl();
-            } else {
+                if (resp.success()) {
+                    return resp.getData().getTmpDownloadUrls()[0].getTmpDownloadUrl();
+                }
+
+                if (resp.getCode() == 99991400) {
+                    throw FsHelperException.builder(ErrorCode.API_CALL_FAILED)
+                            .message("【飞书表格】 获取临时下载地址触发频控限制")
+                            .context("httpStatus", 429)
+                            .build();
+                }
                 FsLogger.warn("【飞书表格】 获取临时下载地址失败！参数：{}，错误信息：{}", fileToken, gson.toJson(resp));
-            }
+                return "";
+            });
         } catch (Exception e) {
             FsLogger.warn("【飞书表格】 获取临时下载地址异常！参数：{}，错误信息：{}", fileToken, e.getMessage());
         }
@@ -452,7 +504,7 @@ public class FsApiUtil {
 
             String startColumn = FsTableUtil.getColumnNameByNuNumber(fromColumnIndex);
             String endColumn = FsTableUtil.getColumnNameByNuNumber(fromColumnIndex + slice.size() - 1);
-            builder.addRange(sheetId + "!" + startColumn + "1:" + endColumn + "1");
+            builder.addRange(sheetId + "!" + startColumn + titleRow + ":" + endColumn + titleRow);
             builder.addRow(slice.toArray());
 
             index = end;
@@ -565,25 +617,33 @@ public class FsApiUtil {
 
     public static Object getTableInfo(String sheetId, String spreadsheetToken, FeishuClient client) {
         try {
-            // 创建请求对象
-            GetSpreadsheetReq req = GetSpreadsheetReq.newBuilder()
-                    .spreadsheetToken(spreadsheetToken)
-                    .build();
+            return executeOfficial(client, ApiOperation.GET_SPREADSHEET, spreadsheetToken, () -> {
+                GetSpreadsheetReq req = GetSpreadsheetReq.newBuilder()
+                        .spreadsheetToken(spreadsheetToken)
+                        .build();
 
-            // 发起请求
-            GetSpreadsheetResp resp = client.sheets().v3().spreadsheet().get(req, client.getCloseOfficialPool()
-                    ? RequestOptions.newBuilder().headers(m).build() : null);
+                GetSpreadsheetResp resp = client.sheets().v3().spreadsheet().get(req, client.getCloseOfficialPool()
+                        ? RequestOptions.newBuilder().headers(m).build() : null);
 
-            // 处理服务端错误
-            if (resp.success()) {
-                return resp.getData();
-            } else {
+                if (resp.success()) {
+                    return resp.getData();
+                }
+
+                if (resp.getCode() == 99991400) {
+                    throw FsHelperException.builder(ErrorCode.API_CALL_FAILED)
+                            .message("【飞书表格】 获取表格信息触发频控限制")
+                            .context("httpStatus", 429)
+                            .build();
+                }
                 FsLogger.warn("【飞书表格】 获取表格信息失败！参数：{}，错误信息：{}", sheetId, resp.getMsg());
-            }
+                return null;
+            });
+        } catch (FsHelperException ex) {
+            throw ex;
         } catch (Exception e) {
             FsLogger.warn("【飞书表格】 获取表格信息异常！参数：{}，错误信息：{}", sheetId, e.getMessage());
+            return null;
         }
-        return null;
     }
 
     /**

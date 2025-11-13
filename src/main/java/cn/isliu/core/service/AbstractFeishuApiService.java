@@ -1,9 +1,13 @@
 package cn.isliu.core.service;
 
 import cn.isliu.core.client.FeishuClient;
+import cn.isliu.core.enums.ErrorCode;
 import cn.isliu.core.exception.FsHelperException;
+import cn.isliu.core.logging.FsLogger;
+import cn.isliu.core.ratelimit.ApiOperation;
+import cn.isliu.core.ratelimit.FeishuApiExecutor;
+import cn.isliu.core.ratelimit.FeishuApiOperationResolver;
 import com.google.gson.Gson;
-import com.google.gson.JsonObject;
 import com.lark.oapi.core.utils.Jsons;
 import okhttp3.*;
 
@@ -19,6 +23,8 @@ public abstract class AbstractFeishuApiService {
     protected final OkHttpClient httpClient;
     protected final Gson gson;
     protected final TenantTokenManager tokenManager;
+    protected final FeishuApiExecutor apiExecutor;
+    protected final String tenantKey;
 
     protected static final String BASE_URL = "https://open.feishu.cn/open-apis";
     protected static final MediaType JSON_MEDIA_TYPE = MediaType.parse("application/json; charset=utf-8");
@@ -33,6 +39,8 @@ public abstract class AbstractFeishuApiService {
         this.httpClient = feishuClient.getHttpClient();
         this.gson = Jsons.DEFAULT;
         this.tokenManager = new TenantTokenManager(feishuClient);
+        this.apiExecutor = feishuClient.apiExecutor();
+        this.tenantKey = feishuClient.getAppId();
     }
 
     /**
@@ -77,13 +85,51 @@ public abstract class AbstractFeishuApiService {
      * @throws IOException 请求异常
      */
     protected <T> T executeRequest(Request request, Class<T> responseClass) throws IOException {
+        return executeRequest(null, request, responseClass);
+    }
+
+    protected <T> T executeRequest(String spreadsheetToken, Request request, Class<T> responseClass) throws IOException {
+        ApiOperation operation = FeishuApiOperationResolver.resolve(request);
+        String docToken = spreadsheetToken != null ? spreadsheetToken
+                : FeishuApiOperationResolver.extractSpreadsheetToken(request);
+        try {
+            return apiExecutor.execute(tenantKey, operation, docToken,
+                    () -> doExecuteRequest(request, responseClass));
+        } catch (FsHelperException | IOException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            if (ex instanceof RuntimeException) {
+                throw (RuntimeException) ex;
+            }
+            throw new IOException("飞书接口调用失败", ex);
+        }
+    }
+
+    private <T> T doExecuteRequest(Request request, Class<T> responseClass) throws IOException {
         try (Response response = httpClient.newCall(request).execute()) {
             if (!response.isSuccessful() || response.body() == null) {
+                if (response.code() == 429) {
+                    FsHelperException exception = FsHelperException.builder(ErrorCode.API_CALL_FAILED)
+                            .message("飞书接口触发频控限制 (429)")
+                            .context("httpStatus", response.code())
+                            .context("x-ogw-ratelimit-limit", response.header("x-ogw-ratelimit-limit"))
+                            .context("x-ogw-ratelimit-reset", response.header("x-ogw-ratelimit-reset"))
+                            .context("requestId", response.header("X-Tt-Logid"))
+                            .build();
+                    FsLogger.warn("飞书接口频控：url={}, headers={}", request.url(),
+                            response.headers().toMultimap());
+                    throw exception;
+                }
                 throw new IOException("Request failed: " + response);
             }
 
             String responseBody = response.body().string();
             return gson.fromJson(responseBody, responseClass);
         }
+    }
+
+    protected <T> T executeWithOperation(ApiOperation operation, String spreadsheetToken,
+                                         FeishuApiExecutor.CheckedCallable<T> action) throws Exception {
+        return apiExecutor.execute(tenantKey, operation, spreadsheetToken, action);
     }
 }
