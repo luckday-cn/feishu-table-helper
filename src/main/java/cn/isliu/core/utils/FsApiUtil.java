@@ -435,15 +435,33 @@ public class FsApiUtil {
     /**
      * 写入表头
      */
-    public static Object writeTableHeaders(String sheetId, String spreadsheetToken, List<String> headers, int titleRow, FeishuClient client) {
-        CustomValueService.ValueRequest.BatchPutValuesBuilder batchPutValuesBuilder = CustomValueService.ValueRequest.batchPutValues();
+    public static Object writeTableHeaders(String sheetId, String spreadsheetToken, List<String> headers,
+                                           int titleRow, FeishuClient client) {
+        if (headers == null || headers.isEmpty()) {
+            return null;
+        }
+
+        CustomValueService.ValueRequest.BatchPutValuesBuilder builder =
+                CustomValueService.ValueRequest.batchPutValues();
+
+        int fromColumnIndex = 1;
+        int index = 0;
+        while (index < headers.size()) {
+            int end = Math.min(index + FsUtil.FS_MAX_COLUMNS_PER_REQUEST, headers.size());
+            List<String> slice = headers.subList(index, end);
+
+            String startColumn = FsTableUtil.getColumnNameByNuNumber(fromColumnIndex);
+            String endColumn = FsTableUtil.getColumnNameByNuNumber(fromColumnIndex + slice.size() - 1);
+            builder.addRange(sheetId + "!" + startColumn + "1:" + endColumn + "1");
+            builder.addRow(slice.toArray());
+
+            index = end;
+            fromColumnIndex += slice.size();
+        }
+
+        Object putValues = FsApiUtil.putValues(spreadsheetToken, builder.build(), client);
 
         String position = FsTableUtil.getColumnNameByNuNumber(headers.size());
-        batchPutValuesBuilder.addRange(sheetId + "!A" + titleRow + ":" + position + titleRow);
-        batchPutValuesBuilder.addRow(headers.toArray());
-
-        Object putValues = FsApiUtil.putValues(spreadsheetToken, batchPutValuesBuilder.build(), client);
-
         String[] positionArr = {"A" + titleRow, position + titleRow};
         MapSheetConfig config = MapSheetConfig.createDefault();
 
@@ -509,25 +527,40 @@ public class FsApiUtil {
 
     public static Object addRowColumns(String sheetId, String spreadsheetToken, String type, int length,FeishuClient client) {
 
-        CustomDimensionService.DimensionBatchUpdateRequest batchRequest = CustomDimensionService.DimensionBatchUpdateRequest.newBuilder()
-                .addRequest(CustomDimensionService.DimensionRequest.addDimension()
-                        .sheetId(sheetId)
-                        .majorDimension(type)
-                        .length(length).build())
-                .build();
-
-        try {
-            ApiResponse batchResp = client.customDimensions().dimensionsBatchUpdate(spreadsheetToken, batchRequest);
-            if (batchResp.success()) {
-                return batchResp.getData();
-            } else {
-                FsLogger.warn("【飞书表格】 添加行列失败！参数：{}，错误信息：{}", sheetId, gson.toJson(batchResp));
-                throw new FsHelperException("【飞书表格】 添加行列失败！");
-            }
-        } catch (IOException e) {
-            FsLogger.warn("【飞书表格】 添加行列异常！参数：{}，错误信息：{}", sheetId, e.getMessage());
-            throw new FsHelperException("【飞书表格】 添加行列异常！");
+        if (length <= 0) {
+            return null;
         }
+
+        Object lastRespData = null;
+        int remaining = length;
+
+        while (remaining > 0) {
+            int batchLength = Math.min(remaining, FsUtil.FS_MAX_DIMENSION_LENGTH);
+
+            CustomDimensionService.DimensionBatchUpdateRequest batchRequest =
+                    CustomDimensionService.DimensionBatchUpdateRequest.newBuilder()
+                            .addRequest(CustomDimensionService.DimensionRequest.addDimension()
+                                    .sheetId(sheetId)
+                                    .majorDimension(type)
+                                    .length(batchLength).build())
+                            .build();
+
+            try {
+                ApiResponse batchResp = client.customDimensions().dimensionsBatchUpdate(spreadsheetToken, batchRequest);
+                if (batchResp.success()) {
+                    lastRespData = batchResp.getData();
+                } else {
+                    FsLogger.warn("【飞书表格】 添加行列失败！参数：{}，长度：{}，错误信息：{}", sheetId, batchLength, gson.toJson(batchResp));
+                    throw new FsHelperException("【飞书表格】 添加行列失败！");
+                }
+            } catch (IOException e) {
+                FsLogger.warn("【飞书表格】 添加行列异常！参数：{}，长度：{}，错误信息：{}", sheetId, batchLength, e.getMessage());
+                throw new FsHelperException("【飞书表格】 添加行列异常！");
+            }
+
+            remaining -= batchLength;
+        }
+        return lastRespData;
     }
 
     public static Object getTableInfo(String sheetId, String spreadsheetToken, FeishuClient client) {

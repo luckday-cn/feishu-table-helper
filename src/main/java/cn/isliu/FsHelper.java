@@ -350,7 +350,7 @@ public class FsHelper {
         int rowTotal = sheet.getGridProperties().getRowCount();
         int rowNum = rowCount.get();
         if (rowNum >= rowTotal) {
-            FsApiUtil.addRowColumns(sheetId, spreadsheetToken, "ROWS", Math.abs(rowTotal - rowNum), client);
+            FsApiUtil.addRowColumns(sheetId, spreadsheetToken, FsUtil.ROWS, Math.abs(rowTotal - rowNum), client);
         }
 
         Object resp = FsApiUtil.batchPutValues(sheetId, spreadsheetToken, resultValuesBuilder.build(), client);

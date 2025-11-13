@@ -559,7 +559,7 @@ public class MapWriteBuilder {
     private void ensureSufficientRows(Sheet sheet, int requiredRows, FeishuClient client) {
         int rowTotal = sheet.getGridProperties().getRowCount();
         if (requiredRows >= rowTotal) {
-            FsApiUtil.addRowColumns(sheetId, spreadsheetToken, "ROWS", Math.abs(requiredRows - rowTotal), client);
+            FsApiUtil.addRowColumns(sheetId, spreadsheetToken, FsUtil.ROWS, Math.abs(requiredRows - rowTotal), client);
         }
     }
 
